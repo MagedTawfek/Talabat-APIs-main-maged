@@ -1,0 +1,34 @@
+@baseUrl = https://localhost:7284
+@accessToken = {{token returned by login}}
+
+### List roles
+GET {{baseUrl}}/api/roles
+Authorization: Bearer {{accessToken}}
+
+### Create a role (Admin only)
+POST {{baseUrl}}/api/roles
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Driver",
+  "permissions": ["orders.read", "orders.update"]
+}
+
+### Add a permission to a role (Admin only)
+PUT {{baseUrl}}/api/roles/Driver/permissions
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "permission": "orders.cancel"
+}
+
+### Assign a role to an account (Admin only)
+PUT {{baseUrl}}/api/roles/users/customer@example.com/role
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "roleName": "Driver"
+}

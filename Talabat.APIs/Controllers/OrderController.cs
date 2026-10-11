@@ -1,0 +1,77 @@
+﻿using System.Security.Claims;
+using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Talabat.APIs.DTOs;
+using Talabat.APIs.Errors;
+using Talabat.Core.Models;
+using Talabat.Core.Models.Identity;
+using Talabat.Core.Models.Order_Aggregate;
+using Talabat.Core.Repositories.Contract;
+using Talabat.Core.Services.Contract;
+using Address = Talabat.Core.Models.Order_Aggregate.Address;
+
+namespace Talabat.APIs.Controllers
+{
+    [Authorize(Roles = "Customer")]
+    public class OrderController : BaseApiController
+    {
+        private readonly IOrderService _orderService;
+        private readonly IMapper _mapper;
+
+        public OrderController(IOrderService orderService,
+        IMapper mapper)
+        {
+            _orderService = orderService;
+            _mapper = mapper;
+        }
+        [ProducesResponseType(typeof(Order),200)]
+        [ProducesResponseType(typeof(ApiResponse),400)]
+
+        [HttpPost]
+        public async Task<ActionResult<OrderToReturnDto>> CreateOrder(OrderDto orderDto)
+        {
+            var buyerEmail = User.FindFirstValue(ClaimTypes.Email);
+            var address = _mapper.Map<AddressDto, Address>(orderDto.ShippingAddress);
+            var userId = HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(buyerEmail) || string.IsNullOrWhiteSpace(userId))
+                return Unauthorized(new ApiResponse(401));
+
+            var order = await _orderService.CreateOrderAsync(buyerEmail, userId, orderDto.BasketId, orderDto.DeliveryMethodId, address);
+
+           if (order is null) return BadRequest(new ApiResponse(400));
+
+           return Ok(_mapper.Map<Order, OrderToReturnDto>(order));
+
+        }
+        [HttpGet]
+        public async Task<ActionResult<IReadOnlyList<OrderToReturnDto>>> GetOrdersForUser()
+        {
+            var buyerEmail = User.FindFirstValue(ClaimTypes.Email);
+            if (string.IsNullOrWhiteSpace(buyerEmail)) return Unauthorized(new ApiResponse(401));
+
+            var orders = await _orderService.GetOrdersForUserAsync(buyerEmail);
+            return Ok(_mapper.Map<IReadOnlyList<Order>, IReadOnlyList<OrderToReturnDto>>(orders));
+        }
+        [ProducesResponseType(typeof(Order),200)]
+        [ProducesResponseType(typeof(ApiResponse),400)]
+        [HttpGet("{id}")]
+        public async Task<ActionResult<OrderToReturnDto>> GetOrderById(int id)
+        {
+            var buyerEmail = User.FindFirstValue(ClaimTypes.Email);
+            if (string.IsNullOrWhiteSpace(buyerEmail)) return Unauthorized(new ApiResponse(401));
+
+            var order = await _orderService.GetOrderByIdForUserAsync(id, buyerEmail);
+            if (order is null) return NotFound(new ApiResponse(404));
+            return Ok(_mapper.Map<Order,OrderToReturnDto>(order));
+        }
+        [HttpGet("deliveryMethods")]
+        [AllowAnonymous]
+        public async Task<ActionResult<IReadOnlyList<DeliveryMethod>>> GetDeliveryMethods()
+        {
+            return Ok(await _orderService.GetDeliveryMethodsAsync());
+        }
+        
+    }
+}

@@ -1,0 +1,7 @@
+@baseUrl = https://localhost:7284
+
+### Return a structured 404 response
+GET {{baseUrl}}/errors/404
+
+### Reject a non-error status code
+GET {{baseUrl}}/errors/200
