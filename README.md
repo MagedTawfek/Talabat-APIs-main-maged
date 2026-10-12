@@ -69,8 +69,8 @@ src/
 - API documentation available at `https://localhost:7284/swagger/index.html`
 - Protected endpoints require the JWT access token returned by `/api/account/login` or `/api/account/register`. In Swagger, click **Authorize** and enter the access token. Login, registration, token refresh, product browsing, delivery-method browsing, and error handling are public.
 - New accounts are assigned the `Customer` role automatically. The initial roles are `Admin`, `Customer`, and `Driver`.
-- The `Driver` role currently has no driver-specific API endpoints; drivers can use public catalog and authenticated account endpoints, while basket and order endpoints are Customer-only.
-- Authorization matrix: product catalog and delivery methods are public; account profile, address, password, and logout endpoints require authentication; baskets and orders require `Customer` and are scoped to the signed-in user; all role endpoints and email-existence lookup require `Admin`.
+- The `Driver` role has no default permissions. An administrator can grant it specific capabilities, such as reading orders, through role permissions.
+- Authorization matrix: product catalog is public; account profile, address, password, and logout endpoints require authentication; basket/order endpoints require their matching permissions and remain scoped to the signed-in user. Role management and email lookup require their matching permissions; the `Admin` role receives them by default.
 - Each account has one role at a time. Changing a user's role revokes that user's refresh-token sessions. Existing access tokens expire within 10 minutes, after which the user must sign in again to receive the current role.
 - Access tokens expire after 10 minutes and are checked against the user's Identity security stamp, so logout, password changes, and role changes invalidate them immediately. Refresh tokens are stored as hashes, rotate on refresh, and are revoked on logout, password change, or role change. Reuse of a rotated refresh token revokes that token family.
 - Detailed endpoint documentation in the `Talabat.APIs` project
@@ -90,39 +90,39 @@ src/
 - `GET /api/account`: Get the current user
 - `GET /api/account/address`: Get the user's address
 - `PUT /api/account/address`: Update the user's address
-- `GET /api/account/emailexists`: Check if an email exists (Admin only)
+- `GET /api/account/emailexists`: Check if an email exists (`accounts.email.lookup`)
 - `PUT /api/account/update`: Update the user's information
-- `PUT /api/account/updatepassword`: Update the user's password
+- `PUT /api/account/updatepassword`: Change the user's password using `currentPassword` and `newPassword`. The new password must follow Identity's password rules and differ from the current one. A successful response returns a replacement access token and refresh token; the client must store both and use the new access token for later requests.
 - `POST /api/account/logout`: Revoke the user's refresh-token sessions
 
 **RolesController**
 - `GET /api/roles`: List roles and their permissions
 - `GET /api/roles/{roleName}`: Get a role and its permissions
-- `POST /api/roles`: Create a role with an optional `permissions` array (Admin only)
-- `PUT /api/roles/{roleName}/permissions`: Add a permission using `{ "permission": "orders.read" }` (Admin only)
-- `PUT /api/roles/users/{email}/role`: Set a user's role (Admin only)
+- `POST /api/roles`: Create a role with an optional `permissions` array (`roles.manage`)
+- `PUT /api/roles/{roleName}/permissions`: Add a permission using `{ "permission": "orders.read" }` (`roles.manage`)
+- `PUT /api/roles/users/{email}/role`: Set a user's role (`roles.manage`)
 
-Role permissions are included as `permission` claims in newly issued JWTs. Protect an endpoint with `[Authorize(Policy = "permission:orders.read")]` to require a permission claim for that action.
+Role permissions are enforced on the protected basket, order, product creation, and role management endpoints. The API copies permission claims from the user's role into newly issued JWTs and checks the matching permission policy on every request. Default permissions are assigned to the `Admin` and `Customer` roles at startup; the `Driver` role has no default permissions. After changing a role's permissions or assigning a different role, the affected user must sign in again to get a token containing the updated permissions.
+
+Permission names currently used by endpoints: `basket.read`, `basket.write`, `basket.delete`, `orders.create`, `orders.read`, `products.create`, `roles.manage`, and `accounts.email.lookup`. For example, adding `orders.read` to a role allows its signed-in users to read their own orders; users without that permission receive `403 Forbidden`.
 
 **BasketController**
-- `GET /api/basket`: Get the signed-in customer's basket (no basket ID is supplied)
-- `POST /api/basket`: Update the signed-in customer's basket with product IDs and quantities; basket ID and product details/prices are assigned by the server. Example body: `{ "items": [{ "productId": 1, "quantity": 2 }] }`
-- `DELETE /api/basket`: Delete the signed-in customer's basket
+- `GET /api/basket`: Get the signed-in user's basket (`basket.read`; no basket ID is supplied)
+- `POST /api/basket`: Update the signed-in user's basket (`basket.write`) with product IDs and quantities; basket ID and product details/prices are assigned by the server. Example body: `{ "items": [{ "productId": 1, "quantity": 2 }] }`
+- `DELETE /api/basket`: Delete the signed-in user's basket (`basket.delete`)
 
 **ErrorsController**
 - `GET /errors/{code}`: Handle errors
 
 **OrderController**
-- `POST /api/order`: Create a new order using the signed-in customer's basket; send only a delivery method ID and shipping address. Basket ID and shipping cost come from server-side data.
-- `GET /api/order`: Get orders for the current user
-- `GET /api/order/{id}`: Get an order by ID
-- `GET /api/order/deliveryMethods`: Get delivery methods
+- `POST /api/order`: Create a new order (`orders.create`) using the signed-in user's basket; send the shipping address. Basket ID comes from server-side data; total is calculated from current product prices.
+- `GET /api/order`: Get orders for the current user (`orders.read`)
+- `GET /api/order/{id}`: Get an order by ID (`orders.read`)
 
 **ProductsController**
+- `POST /api/products`: Create a product (`products.create`; assigned to `Admin` by default). Send `name`, `description`, `pictureUrl`, and `price`; the product ID is generated by the server.
 - `GET /api/products`: Get a list of products
 - `GET /api/products/{id}`: Get a product by ID
-- `GET /api/products/brands`: Get a list of product brands
-- `GET /api/products/categories`: Get a list of product categories
 
 ### Testing
 ```bash

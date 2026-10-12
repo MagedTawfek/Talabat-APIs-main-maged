@@ -33,7 +33,7 @@ public class EndpointContractTests
                 action.IsDefined(typeof(AcceptVerbsAttribute), inherit: true)));
         }
 
-        Assert.Equal(27, controllers.Sum(controller => controller.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
+        Assert.Equal(26, controllers.Sum(controller => controller.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
             .Count(method => method.GetCustomAttributes().OfType<HttpMethodAttribute>().Any() ||
                              method.IsDefined(typeof(AcceptVerbsAttribute), inherit: true))));
     }
@@ -41,6 +41,10 @@ public class EndpointContractTests
     [Fact]
     public void ClientRequestsOnlyContainValuesTheClientOwns()
     {
+        Assert.DoesNotContain(typeof(CreateProductDto).GetProperties(), property => property.Name.Contains("Brand", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(typeof(ProductToReturnDto).GetProperties(), property => property.Name.Contains("Brand", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(typeof(CreateProductDto).GetProperties(), property => property.Name.Contains("Category", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(typeof(ProductToReturnDto).GetProperties(), property => property.Name.Contains("Category", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(typeof(CustomerBasketDto).GetProperties(), property => property.Name is "Id" or "OwnerId" or "ShippingPrice");
         Assert.Equal(new[] { "ProductId", "Quantity" }, typeof(BasketItemDto).GetProperties().Select(property => property.Name).OrderBy(name => name));
         Assert.DoesNotContain(typeof(OrderDto).GetProperties(), property => property.Name is "BasketId" or "ShippingPrice");

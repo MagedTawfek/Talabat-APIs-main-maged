@@ -26,6 +26,10 @@ namespace Talabat.APIs
         {
             var builder = WebApplication.CreateBuilder(args);
 
+            // Keep startup failures visible in the console without requiring Windows Event Log permissions.
+            builder.Logging.ClearProviders();
+            builder.Logging.AddConsole();
+
             #region ConfigureServices
             // Add services to the container.
             builder.Services.AddControllers();

@@ -18,8 +18,8 @@ public class OrderFlowTests
         string? basketIdUsed = null;
         var orderService = new Mock<IOrderService>();
         orderService.Setup(service => service.CreateOrderAsync(
-                "customer@example.com", customerId, It.IsAny<string>(), 2, It.IsAny<Address>()))
-            .Callback<string, string, string, int, Address>((_, _, basketId, _, _) => basketIdUsed = basketId)
+                "customer@example.com", customerId, It.IsAny<string>(), It.IsAny<Address>()))
+            .Callback<string, string, string, Address>((_, _, basketId, _) => basketIdUsed = basketId)
             .ReturnsAsync((Order?)null);
 
         var controller = new OrderController(orderService.Object, Mock.Of<AutoMapper.IMapper>())
@@ -40,7 +40,6 @@ public class OrderFlowTests
 
         var result = await controller.CreateOrder(new OrderDto
         {
-            DeliveryMethodId = 2,
             ShippingAddress = new AddressDto
             {
                 FirstName = "Ada",
@@ -54,6 +53,6 @@ public class OrderFlowTests
         Assert.IsType<BadRequestObjectResult>(result.Result);
         Assert.Equal(customerId, basketIdUsed);
         orderService.Verify(service => service.CreateOrderAsync(
-            "customer@example.com", customerId, customerId, 2, It.IsAny<Address>()), Times.Once);
+            "customer@example.com", customerId, customerId, It.IsAny<Address>()), Times.Once);
     }
 }

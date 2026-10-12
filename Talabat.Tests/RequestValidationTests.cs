@@ -34,7 +34,7 @@ public class RequestValidationTests
     {
         Assert.False(IsValid(new BasketItemDto { ProductId = 0, Quantity = 0 }));
         Assert.False(IsValid(new BasketItemDto { ProductId = 4, Quantity = 0 }));
-        Assert.False(IsValid(new OrderDto { DeliveryMethodId = 0, ShippingAddress = new AddressDto() }));
+        Assert.True(IsValid(new OrderDto { ShippingAddress = new AddressDto() }));
         Assert.True(IsValid(new BasketItemDto { ProductId = 4, Quantity = 2 }));
     }
 

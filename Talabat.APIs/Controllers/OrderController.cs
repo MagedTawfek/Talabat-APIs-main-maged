@@ -14,7 +14,6 @@ using Address = Talabat.Core.Models.Order_Aggregate.Address;
 
 namespace Talabat.APIs.Controllers
 {
-    [Authorize(Roles = "Customer")]
     public class OrderController : BaseApiController
     {
         private readonly IOrderService _orderService;
@@ -26,6 +25,7 @@ namespace Talabat.APIs.Controllers
             _orderService = orderService;
             _mapper = mapper;
         }
+        [Authorize(Policy = "permission:" + RolePermission.OrdersCreate)]
         [ProducesResponseType(typeof(Order),200)]
         [ProducesResponseType(typeof(ApiResponse),400)]
 
@@ -38,13 +38,14 @@ namespace Talabat.APIs.Controllers
             if (string.IsNullOrWhiteSpace(buyerEmail) || string.IsNullOrWhiteSpace(userId))
                 return Unauthorized(new ApiResponse(401));
 
-            var order = await _orderService.CreateOrderAsync(buyerEmail, userId, userId, orderDto.DeliveryMethodId, address);
+            var order = await _orderService.CreateOrderAsync(buyerEmail, userId, userId, address);
 
            if (order is null) return BadRequest(new ApiResponse(400));
 
            return Ok(_mapper.Map<Order, OrderToReturnDto>(order));
 
         }
+        [Authorize(Policy = "permission:" + RolePermission.OrdersRead)]
         [HttpGet]
         public async Task<ActionResult<IReadOnlyList<OrderToReturnDto>>> GetOrdersForUser()
         {
@@ -54,6 +55,7 @@ namespace Talabat.APIs.Controllers
             var orders = await _orderService.GetOrdersForUserAsync(buyerEmail);
             return Ok(_mapper.Map<IReadOnlyList<Order>, IReadOnlyList<OrderToReturnDto>>(orders));
         }
+        [Authorize(Policy = "permission:" + RolePermission.OrdersRead)]
         [ProducesResponseType(typeof(Order),200)]
         [ProducesResponseType(typeof(ApiResponse),400)]
         [HttpGet("{id}")]
@@ -66,12 +68,5 @@ namespace Talabat.APIs.Controllers
             if (order is null) return NotFound(new ApiResponse(404));
             return Ok(_mapper.Map<Order,OrderToReturnDto>(order));
         }
-        [HttpGet("deliveryMethods")]
-        [AllowAnonymous]
-        public async Task<ActionResult<IReadOnlyList<DeliveryMethod>>> GetDeliveryMethods()
-        {
-            return Ok(await _orderService.GetDeliveryMethodsAsync());
-        }
-        
     }
 }

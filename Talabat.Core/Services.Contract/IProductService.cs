@@ -11,8 +11,6 @@ public interface IProductService
 
     Task<int> GetCountAsync(ProductsSpecParams specParams);
 
-    Task<IReadOnlyList<ProductBrand>> GetBrandsAsync();
-
-    Task<IReadOnlyList<ProductCategory>> GetCategoryAsync();
+    Task<Product> CreateProductAsync(Product product);
 
 }

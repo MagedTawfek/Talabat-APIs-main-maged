@@ -20,8 +20,5 @@ internal class OrderConfigurations : IEntityTypeConfiguration<Order>
             );
       builder.Property(o=>o.Subtotal)
           .HasColumnType("decimal(18,2)");
-      builder.HasOne(o=>o.DeliveryMethod)
-          .WithMany()
-          .OnDelete(DeleteBehavior.SetNull);    
     }
 }

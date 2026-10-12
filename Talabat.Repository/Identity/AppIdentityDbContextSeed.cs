@@ -7,6 +7,12 @@ namespace Talabat.Repository.Identity;
 public static class AppIdentityDbContextSeed
 {
     private static readonly string[] DefaultRoles = ["Admin", "Customer", "Driver"];
+    private static readonly IReadOnlyDictionary<string, string[]> DefaultRolePermissions = new Dictionary<string, string[]>
+    {
+        ["Admin"] = [RolePermission.ProductsCreate, RolePermission.RolesManage, RolePermission.AccountEmailLookup],
+        ["Customer"] = [RolePermission.BasketRead, RolePermission.BasketWrite, RolePermission.BasketDelete,
+            RolePermission.OrdersCreate, RolePermission.OrdersRead]
+    };
 
     public static async Task SeedRolesAndAdminAsync(
         RoleManager<IdentityRole> roleManager,
@@ -26,6 +32,26 @@ public static class AppIdentityDbContextSeed
             {
                 throw new InvalidOperationException(
                     $"Failed to create the required {roleName} role: {string.Join("; ", roleResult.Errors.Select(error => error.Description))}");
+            }
+        }
+
+        foreach (var (roleName, permissions) in DefaultRolePermissions)
+        {
+            var role = await roleManager.FindByNameAsync(roleName)
+                ?? throw new InvalidOperationException($"The required {roleName} role could not be loaded.");
+            var existingPermissions = (await roleManager.GetClaimsAsync(role))
+                .Where(claim => claim.Type == RolePermission.ClaimType)
+                .Select(claim => claim.Value)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var permission in permissions.Where(permission => !existingPermissions.Contains(permission)))
+            {
+                var result = await roleManager.AddClaimAsync(role, new System.Security.Claims.Claim(RolePermission.ClaimType, permission));
+                if (!result.Succeeded)
+                {
+                    throw new InvalidOperationException(
+                        $"Failed to assign the default permission {permission} to {roleName}: {string.Join("; ", result.Errors.Select(error => error.Description))}");
+                }
             }
         }
 

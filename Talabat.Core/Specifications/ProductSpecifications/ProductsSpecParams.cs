@@ -3,9 +3,6 @@
 public class ProductsSpecParams
 {
     public string? sort { get; set; }
-    public int? brandId { get; set; }
-    public int? categoryId { get; set; }
-    
     private const int MazPageSize = 10;
     private int _pageSize = 5  ;
     public int PageSize
@@ -19,6 +16,6 @@ public class ProductsSpecParams
     public string? Search
     {
         get => _search;
-        set => _search = value.ToLower();
+        set => _search = value?.ToLower();
     }
 }

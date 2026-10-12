@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
+using Talabat.Core.Models.Identity;
 
 namespace Talabat.APIs.Authorization;
 

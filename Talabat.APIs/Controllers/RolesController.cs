@@ -10,7 +10,7 @@ using Talabat.Repository.Identity;
 
 namespace Talabat.APIs.Controllers;
 
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = "permission:" + RolePermission.RolesManage)]
 public sealed class RolesController(
     RoleManager<IdentityRole> roleManager,
     UserManager<AppUser> userManager,
@@ -40,7 +40,6 @@ public sealed class RolesController(
             Ok(await ToRoleDtoAsync(role));
     }
 
-    [Authorize(Roles = "Admin")]
     [HttpPost]
     public async Task<ActionResult<RoleDto>> CreateRole(CreateRoleDto request)
     {
@@ -74,7 +73,6 @@ public sealed class RolesController(
         return CreatedAtAction(nameof(GetRole), new { roleName = role.Name }, response);
     }
 
-    [Authorize(Roles = "Admin")]
     [HttpPut("{roleName}/permissions")]
     public async Task<ActionResult<RoleDto>> AddPermission(string roleName, UpdateRolePermissionDto request)
     {
@@ -104,7 +102,7 @@ public sealed class RolesController(
             .Select(claim => claim.Value)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var permission in permissions.Select(value => value.Trim()).Distinct(StringComparer.OrdinalIgnoreCase))
+        foreach (var permission in permissions.Select(value => value.Trim().ToLowerInvariant()).Distinct(StringComparer.OrdinalIgnoreCase))
         {
             if (string.IsNullOrWhiteSpace(permission))
             {
@@ -135,7 +133,6 @@ public sealed class RolesController(
             .ToArray());
     }
 
-    [Authorize(Roles = "Admin")]
     [HttpPut("users/{email}/role")]
     public async Task<ActionResult<UserRoleDto>> AssignRole(string email, AssignRoleDto request)
     {

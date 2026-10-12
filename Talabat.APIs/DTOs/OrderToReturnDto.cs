@@ -14,12 +14,6 @@ public class OrderToReturnDto
     public Address ShipToAddress { get; set; }
     
     
-    public int? DeliveryMethodId { get; set; }
-    
-    public string DeliveryMethod { get; set; }
-    
-    public decimal DeliveryMethodCost { get; set; }
-
     public List<OrderItemDto> Items { get; set; }
     
     public decimal Total { get; set; }

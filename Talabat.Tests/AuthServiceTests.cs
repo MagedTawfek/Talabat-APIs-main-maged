@@ -23,7 +23,8 @@ public class AuthServiceTests
         var userManager = CreateUserManager(user);
         var roleManager = CreateRoleManager();
         roleManager.Setup(manager => manager.FindByNameAsync("Customer")).ReturnsAsync(new IdentityRole("Customer"));
-        roleManager.Setup(manager => manager.GetClaimsAsync(It.IsAny<IdentityRole>())).ReturnsAsync([]);
+        roleManager.Setup(manager => manager.GetClaimsAsync(It.IsAny<IdentityRole>()))
+            .ReturnsAsync([new Claim("permission", "orders.read")]);
         var service = new AuthService(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["JWT:SecretKey"] = Secret,
@@ -42,6 +43,7 @@ public class AuthServiceTests
         Assert.True(DateTime.UtcNow.AddMinutes(9) < token.ValidTo);
         Assert.True(DateTime.UtcNow.AddMinutes(11) > token.ValidTo);
         Assert.Contains(token.Claims, claim => claim.Type == ClaimTypes.Role && claim.Value == "Customer");
+        Assert.Contains(token.Claims, claim => claim.Type == "permission" && claim.Value == "orders.read");
         Assert.Equal("2", token.Claims.Single(claim => claim.Type == "token_version").Value);
         Assert.Equal(user.SecurityStamp, token.Claims.Single(claim => claim.Type == "security_stamp").Value);
 

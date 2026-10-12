@@ -41,13 +41,9 @@ public class CatalogAndErrorEndpointTests
     {
         var service = new Mock<IProductService>();
         service.Setup(value => value.GetProductAsync(999)).ReturnsAsync((Product?)null);
-        service.Setup(value => value.GetBrandsAsync()).ReturnsAsync(Array.Empty<ProductBrand>());
-        service.Setup(value => value.GetCategoryAsync()).ReturnsAsync(Array.Empty<ProductCategory>());
         var controller = new ProductsController(Mock.Of<IMapper>(), service.Object);
 
         Assert.IsType<NotFoundObjectResult>((await controller.GetProduct(999)).Result);
-        Assert.Empty(Assert.IsType<OkObjectResult>((await controller.GetProductBrands()).Result).Value as IEnumerable<ProductBrand> ?? []);
-        Assert.Empty(Assert.IsType<OkObjectResult>((await controller.GetProductCategories()).Result).Value as IEnumerable<ProductCategory> ?? []);
     }
 
     [Theory]

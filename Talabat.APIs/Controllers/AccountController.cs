@@ -225,7 +225,7 @@ namespace Talabat.APIs.Controllers
             if (result.Succeeded) return Ok(_mapper.Map<Address, AddressDto>(user.Address));
             return BadRequest("Problem updating the user");
         }
-        [Authorize(Roles = "Admin")]
+        [Authorize(Policy = "permission:" + RolePermission.AccountEmailLookup)]
         [HttpGet("emailexists")]
         public async Task<ActionResult<bool>> CheckEmailExistsAsync([FromQuery] string email)
         {
@@ -253,12 +253,28 @@ namespace Talabat.APIs.Controllers
             return Ok(new UserProfileDto(user.Id, user.Email!, user.DisplayName));
         }
         [HttpPut("updatepassword")]
-        public async Task<ActionResult> UpdateUserPassword([FromBody] UpdatePasswordDto passwords)
+        public async Task<ActionResult<UserDto>> UpdateUserPassword([FromBody] UpdatePasswordDto passwords)
         {
             var user = await _userManager.FindByIdAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             if (user == null)
             {
                 return NotFound(new ApiResponse(404, "User not found"));
+            }
+
+            if (!await _userManager.CheckPasswordAsync(user, passwords.CurrentPassword))
+            {
+                return BadRequest(new ApiValidationErrorResponse
+                {
+                    Errors = ["Current password is incorrect."]
+                });
+            }
+
+            if (await _userManager.CheckPasswordAsync(user, passwords.NewPassword))
+            {
+                return BadRequest(new ApiValidationErrorResponse
+                {
+                    Errors = ["New password must be different from the current password."]
+                });
             }
 
             var result = await _userManager.ChangePasswordAsync(user, passwords.CurrentPassword, passwords.NewPassword);
@@ -272,7 +288,14 @@ namespace Talabat.APIs.Controllers
 
             await RevokeRefreshTokensAsync(user.Id);
 
-            return Ok();
+            return Ok(new UserDto
+            {
+                Id = user.Id,
+                Email = user.Email,
+                DisplayName = user.DisplayName,
+                Token = await _authService.CreateTokenAsync(user, _userManager),
+                RefreshToken = await IssueRefreshTokenAsync(user)
+            });
         }
 
         [HttpPost("logout")]
@@ -296,9 +319,14 @@ namespace Talabat.APIs.Controllers
         private Task<int> RevokeRefreshTokensAsync(string userId)
         {
             var now = DateTime.UtcNow;
-            return _identityDbContext.UserRefreshTokens
-                .Where(token => token.UserId == userId && token.RevokedAtUtc == null)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(token => token.RevokedAtUtc, now));
+            var activeTokens = _identityDbContext.UserRefreshTokens
+                .Where(token => token.UserId == userId && token.RevokedAtUtc == null);
+            if (_identityDbContext.Database.IsRelational())
+            {
+                return activeTokens.ExecuteUpdateAsync(setters => setters.SetProperty(token => token.RevokedAtUtc, now));
+            }
+
+            return RevokeTrackedTokensAsync(activeTokens, now);
         }
 
         private Task<int> RevokeRefreshFamilyAsync(string familyId, DateTime revokedAtUtc)
@@ -306,6 +334,18 @@ namespace Talabat.APIs.Controllers
             return _identityDbContext.UserRefreshTokens
                 .Where(token => token.FamilyId == familyId && token.RevokedAtUtc == null)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(token => token.RevokedAtUtc, revokedAtUtc));
+        }
+
+        private async Task<int> RevokeTrackedTokensAsync(IQueryable<UserRefreshToken> activeTokens, DateTime revokedAtUtc)
+        {
+            var tokens = await activeTokens.ToListAsync();
+            foreach (var token in tokens)
+            {
+                token.RevokedAtUtc = revokedAtUtc;
+            }
+
+            await _identityDbContext.SaveChangesAsync();
+            return tokens.Count;
         }
     }
 }

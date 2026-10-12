@@ -10,22 +10,28 @@ namespace Talabat.Tests;
 public class AuthorizationPolicyTests
 {
     [Fact]
-    public void ProductCatalogIsPublicReadOnlySurface()
+    public void ProductCatalogIsPublicAndProductCreationRequiresItsPermission()
     {
-        Assert.True(typeof(ProductsController).IsDefined(typeof(AllowAnonymousAttribute), inherit: true));
-        Assert.All(HttpActions(typeof(ProductsController)), method => Assert.False(method.IsDefined(typeof(AuthorizeAttribute), true)));
+        var actions = HttpActions(typeof(ProductsController)).ToArray();
+        Assert.All(actions.Where(method => method.Name != nameof(ProductsController.CreateProduct)),
+            method => Assert.True(method.IsDefined(typeof(AllowAnonymousAttribute), inherit: true)));
+
+        var createProduct = typeof(ProductsController).GetMethod(nameof(ProductsController.CreateProduct))!;
+        Assert.Equal("permission:products.create", Assert.IsType<AuthorizeAttribute>(Attribute.GetCustomAttribute(
+            createProduct, typeof(AuthorizeAttribute), inherit: true)).Policy);
     }
 
     [Fact]
-    public void BasketAndOrderActionsAreCustomerOnlyExceptDeliveryCatalog()
+    public void BasketAndOrderActionsRequireThePermissionForThatAction()
     {
-        Assert.Equal("Customer", Assert.IsType<AuthorizeAttribute>(Attribute.GetCustomAttribute(
-            typeof(BasketController), typeof(AuthorizeAttribute), inherit: true)).Roles);
-        Assert.Equal("Customer", Assert.IsType<AuthorizeAttribute>(Attribute.GetCustomAttribute(
-            typeof(OrderController), typeof(AuthorizeAttribute), inherit: true)).Roles);
+        AssertPolicy<BasketController>(nameof(BasketController.GetBasket), "permission:basket.read");
+        AssertPolicy<BasketController>(nameof(BasketController.UpdateBasket), "permission:basket.write");
+        AssertPolicy<BasketController>(nameof(BasketController.DeleteBasket), "permission:basket.delete");
+        AssertPolicy<OrderController>(nameof(OrderController.CreateOrder), "permission:orders.create");
+        AssertPolicy<OrderController>(nameof(OrderController.GetOrdersForUser), "permission:orders.read");
+        AssertPolicy<OrderController>(nameof(OrderController.GetOrderById), "permission:orders.read");
 
-        var deliveryMethods = typeof(OrderController).GetMethod(nameof(OrderController.GetDeliveryMethods))!;
-        Assert.True(deliveryMethods.IsDefined(typeof(AllowAnonymousAttribute), inherit: true));
+        Assert.Null(typeof(OrderController).GetMethod("GetDeliveryMethods"));
     }
 
     [Fact]
@@ -44,10 +50,10 @@ public class AuthorizationPolicyTests
     }
 
     [Fact]
-    public void RoleManagementIsAdminOnlyAndCredentialEndpointsAreRateLimited()
+    public void RoleManagementRequiresPermissionAndCredentialEndpointsAreRateLimited()
     {
-        Assert.Equal("Admin", Assert.IsType<AuthorizeAttribute>(Attribute.GetCustomAttribute(
-            typeof(RolesController), typeof(AuthorizeAttribute), inherit: true)).Roles);
+        Assert.Equal("permission:roles.manage", Assert.IsType<AuthorizeAttribute>(Attribute.GetCustomAttribute(
+            typeof(RolesController), typeof(AuthorizeAttribute), inherit: true)).Policy);
 
         foreach (var action in new[] { nameof(AccountController.Login), nameof(AccountController.Register), nameof(AccountController.RefreshToken) })
         {
@@ -57,11 +63,18 @@ public class AuthorizationPolicyTests
     }
 
     [Fact]
-    public void EmailExistenceEndpointIsAdminOnly()
+    public void EmailExistenceEndpointRequiresPermission()
     {
         var action = typeof(AccountController).GetMethod(nameof(AccountController.CheckEmailExistsAsync))!;
-        Assert.Equal("Admin", Assert.IsType<AuthorizeAttribute>(Attribute.GetCustomAttribute(
-            action, typeof(AuthorizeAttribute), inherit: true)).Roles);
+        Assert.Equal("permission:accounts.email.lookup", Assert.IsType<AuthorizeAttribute>(Attribute.GetCustomAttribute(
+            action, typeof(AuthorizeAttribute), inherit: true)).Policy);
+    }
+
+    private static void AssertPolicy<TController>(string actionName, string expectedPolicy)
+    {
+        var action = typeof(TController).GetMethod(actionName)!;
+        Assert.Equal(expectedPolicy, Assert.IsType<AuthorizeAttribute>(Attribute.GetCustomAttribute(
+            action, typeof(AuthorizeAttribute), inherit: true)).Policy);
     }
 
     private static IEnumerable<MethodInfo> HttpActions(Type controller) => controller

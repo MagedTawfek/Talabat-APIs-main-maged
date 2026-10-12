@@ -17,7 +17,7 @@ public class BasketOwnershipTests
         var repository = new BasketRepository(context);
         var basket = new CustomerBasket("basket-id")
         {
-            items = [new BasketItem { Id = 5, productName = "Tea", PictureUrl = "tea.png", Price = 3, Category = "Drinks", Brand = "A", Quantity = 1 }]
+            items = [new BasketItem { Id = 5, productName = "Tea", PictureUrl = "tea.png", Price = 3, Quantity = 1 }]
         };
 
         var saved = await repository.UpdateBasketAsync(basket, "customer-a");
@@ -43,7 +43,7 @@ public class BasketOwnershipTests
         await using var context = new StoreContext(options);
         context.CustomerBaskets.Add(new CustomerBasket("legacy")
         {
-            items = [new BasketItem { Id = 9, productName = "Old item", PictureUrl = "old.png", Price = 1, Category = "Old", Brand = "Old", Quantity = 1 }]
+            items = [new BasketItem { Id = 9, productName = "Old item", PictureUrl = "old.png", Price = 1, Quantity = 1 }]
         });
         await context.SaveChangesAsync();
         var repository = new BasketRepository(context);
@@ -51,7 +51,7 @@ public class BasketOwnershipTests
         Assert.Null(await repository.GetBasketAsync("legacy", "customer-b"));
         var claimed = await repository.UpdateBasketAsync(new CustomerBasket("legacy")
         {
-            items = [new BasketItem { Id = 4, productName = "New item", PictureUrl = "new.png", Price = 2, Category = "New", Brand = "New", Quantity = 1 }]
+            items = [new BasketItem { Id = 4, productName = "New item", PictureUrl = "new.png", Price = 2, Quantity = 1 }]
         }, "customer-b");
 
         Assert.Equal("customer-b", claimed!.OwnerId);

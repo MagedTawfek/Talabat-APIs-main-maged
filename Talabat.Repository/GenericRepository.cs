@@ -17,27 +17,11 @@ public class GenericRepository<T> : IGenericRepository<T> where T : BaseModel
 
     public async Task<T?> GetAsync(int id)
     {
-        // if (typeof(T) == typeof(Product))
-        // {
-        //     return await _dbContext.Set<T>()
-        //         .Include(p => ((Product)(object)p).Category)
-        //         .Include(p => ((Product)(object)p).Brand)
-        //         .FirstOrDefaultAsync(p => ((Product)(object)p).Id == id);
-        // }
-
         return await _dbContext.Set<T>().FindAsync(id);
     }
 
     public async Task<IReadOnlyList<T>> GetAllAsync()
     {
-        // if (typeof(T) == typeof(Product))
-        // {
-        //     return await _dbContext.Set<T>()
-        //         .Include(p => ((Product)(object)p).Category)
-        //         .Include(p => ((Product)(object)p).Brand)
-        //         .ToListAsync();
-        // }
-
         return await _dbContext.Set<T>().ToListAsync();
     }
 

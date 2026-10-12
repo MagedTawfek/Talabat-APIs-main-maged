@@ -3,13 +3,11 @@ using Talabat.Core.Specification;
 
 namespace Talabat.Core.Specifications.ProductSpecifications;
 
-public class ProductWithBrandAndCategorySpecifications : BaseSpecifications<Product>
+public class ProductSpecifications : BaseSpecifications<Product>
 {
-    public ProductWithBrandAndCategorySpecifications(ProductsSpecParams specParams)
+    public ProductSpecifications(ProductsSpecParams specParams)
         : base(p =>
-            (string.IsNullOrEmpty(specParams.Search) || p.Name.ToLower().Contains(specParams.Search)) &&
-            (!specParams.brandId.HasValue || p.BrandId == specParams.brandId.Value) &&
-            (!specParams.categoryId.HasValue || p.CategoryId == specParams.categoryId.Value))
+            (string.IsNullOrEmpty(specParams.Search) || p.Name.ToLower().Contains(specParams.Search)))
     {
         AddIncludes();
         switch (specParams.sort)
@@ -27,7 +25,7 @@ public class ProductWithBrandAndCategorySpecifications : BaseSpecifications<Prod
         ApplyPagination(specParams.PageSize * (specParams.PageIndex - 1), specParams.PageSize);
     }
 
-    public ProductWithBrandAndCategorySpecifications(int id)
+    public ProductSpecifications(int id)
         : base(p => p.Id == id)
     {
         AddIncludes();
@@ -35,7 +33,5 @@ public class ProductWithBrandAndCategorySpecifications : BaseSpecifications<Prod
 
     private void AddIncludes()
     {
-        Includes.Add(p => p.Brand);
-        Includes.Add(p => p.Category);
     }
 }

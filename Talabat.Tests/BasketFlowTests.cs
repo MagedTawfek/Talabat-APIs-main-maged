@@ -23,9 +23,7 @@ public class BasketFlowTests
             Id = 7,
             Name = "Tea",
             Price = 42,
-            PictureUrl = "tea.png",
-            Brand = new ProductBrand { Name = "Brand" },
-            Category = new ProductCategory { Name = "Drinks" }
+            PictureUrl = "tea.png"
         });
 
         CustomerBasket? saved = null;
@@ -49,8 +47,6 @@ public class BasketFlowTests
         Assert.Equal("Tea", item.productName);
         Assert.Equal(42, item.Price);
         Assert.Equal("tea.png", item.PictureUrl);
-        Assert.Equal("Drinks", item.Category);
-        Assert.Equal("Brand", item.Brand);
         Assert.Equal(2, item.Quantity);
     }
 

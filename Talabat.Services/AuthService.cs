@@ -62,7 +62,7 @@ public class AuthService : IAuthService
             if (identityRole is not null)
             {
                 var roleClaims = await _roleManager.GetClaimsAsync(identityRole);
-                authClaims.AddRange(roleClaims.Where(claim => claim.Type == "permission"));
+                authClaims.AddRange(roleClaims.Where(claim => claim.Type == RolePermission.ClaimType));
             }
         }
 

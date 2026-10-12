@@ -52,12 +52,12 @@ public class AddressMappingTests
             config.ConstructServicesUsing(type => Activator.CreateInstance(type, configurationValues)!);
             config.AddProfile<MappingProfiles>();
         });
-        var order = new Order("ada@example.com", new OrderAddress(), new DeliveryMethod("Fast", "Fast", 5m, "1 day"),
+        var order = new Order("ada@example.com", new OrderAddress(),
             [new OrderItem(new ProductItemOrder(7, "Tea", "/tea.png"), 12m, 2)], 24m);
 
         var response = configuration.CreateMapper().Map<OrderToReturnDto>(order);
 
-        Assert.Equal(29m, response.Total);
+        Assert.Equal(24m, response.Total);
         var item = Assert.Single(response.Items);
         Assert.Equal("Tea", item.ProductName);
         Assert.Equal("7", item.ProductId);

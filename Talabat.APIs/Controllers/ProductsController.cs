@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Talabat.APIs.DTOs;
 using Talabat.APIs.Errors;
 using Talabat.APIs.Helpers;
+using Talabat.Core.Models.Identity;
 using Talabat.Core.Models;
 using Talabat.Core.Repositories.Contract;
 using Talabat.Core.Services.Contract;
@@ -14,7 +15,6 @@ namespace Talabat.APIs.Controllers;
 
 [Route($"api/[controller]")]
 [ApiController] 
-[AllowAnonymous]
 public class ProductsController : BaseApiController
 {
 
@@ -26,6 +26,7 @@ public class ProductsController : BaseApiController
         _mapper = mapper;
         _productService = productService;
     }
+    [AllowAnonymous]
     [HttpGet] // api/products
     public async Task<ActionResult<Pagination<ProductToReturnDto>>> GetProducts([FromQuery]ProductsSpecParams specParams)
     {
@@ -37,6 +38,7 @@ public class ProductsController : BaseApiController
    
     [ProducesResponseType(typeof(ProductToReturnDto), 200)]
     [ProducesResponseType(typeof(ApiResponse), 404)]
+    [AllowAnonymous]
     [HttpGet("{id:int}")] // api/products/1
     public async Task<ActionResult<ProductToReturnDto>> GetProduct(int id)
     {
@@ -51,16 +53,23 @@ public class ProductsController : BaseApiController
         return Ok(productToReturn); // 200
     }
     
-    [HttpGet("brands")] // api/products/brands
-    public async Task<ActionResult<IReadOnlyList<ProductBrand>>> GetProductBrands()
+    [Authorize(Policy = "permission:" + RolePermission.ProductsCreate)]
+    [HttpPost]
+    [ProducesResponseType(typeof(ProductToReturnDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiValidationErrorResponse), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<ProductToReturnDto>> CreateProduct([FromBody] CreateProductDto request)
     {
-        return Ok(await _productService.GetBrandsAsync());
-    }
-    
-    [HttpGet("categories")] // api/products/categories  
-    public async Task<ActionResult<IReadOnlyList<ProductCategory>>> GetProductCategories()
-    {
-        return Ok(await _productService.GetCategoryAsync());
+        var product = new Product
+        {
+            Name = request.Name.Trim(),
+            Description = request.Description.Trim(),
+            PictureUrl = request.PictureUrl.Trim(),
+            Price = request.Price
+        };
+
+        var createdProduct = await _productService.CreateProductAsync(product);
+        var response = _mapper.Map<ProductToReturnDto>(createdProduct);
+        return CreatedAtAction(nameof(GetProduct), new { id = createdProduct.Id }, response);
     }
     
 } 

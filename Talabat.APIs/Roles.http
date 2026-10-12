@@ -5,23 +5,13 @@
 GET {{baseUrl}}/api/roles
 Authorization: Bearer {{accessToken}}
 
-### Create a role (Admin only)
-POST {{baseUrl}}/api/roles
-Authorization: Bearer {{accessToken}}
-Content-Type: application/json
-
-{
-  "name": "Driver",
-  "permissions": ["orders.read", "orders.update"]
-}
-
-### Add a permission to a role (Admin only)
+### Add an order permission to Driver (roles.manage required)
 PUT {{baseUrl}}/api/roles/Driver/permissions
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "permission": "orders.cancel"
+  "permission": "orders.read"
 }
 
 ### Assign a role to an account (Admin only)

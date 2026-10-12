@@ -4,12 +4,12 @@ using Microsoft.AspNetCore.Mvc;
 using Talabat.APIs.DTOs;
 using Talabat.APIs.Errors;
 using Talabat.Core.Models;
+using Talabat.Core.Models.Identity;
 using Talabat.Core.Repositories.Contract;
 using Talabat.Core.Services.Contract;
 
 namespace Talabat.APIs.Controllers;
 
-[Authorize(Roles = "Customer")]
 public class BasketController : BaseApiController
 {
     private readonly IBasketRepository _basketRepository;
@@ -23,6 +23,7 @@ public class BasketController : BaseApiController
 
     private string OwnerId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
 
+    [Authorize(Policy = "permission:" + RolePermission.BasketRead)]
     [HttpGet]
     public async Task<ActionResult<CustomerBasket>> GetBasket()
     {
@@ -30,6 +31,7 @@ public class BasketController : BaseApiController
         return Ok(basket ?? new CustomerBasket(OwnerId) { OwnerId = OwnerId });
     }
 
+    [Authorize(Policy = "permission:" + RolePermission.BasketWrite)]
     [HttpPost]
     public async Task<ActionResult<CustomerBasket>> UpdateBasket(CustomerBasketDto basket)
     {
@@ -48,7 +50,7 @@ public class BasketController : BaseApiController
             }
 
             var product = await _productService.GetProductAsync(item.ProductId);
-            if (product?.Brand is null || product.Category is null)
+            if (product is null)
             {
                 return NotFound(new ApiResponse(404, $"Product {item.ProductId} was not found."));
             }
@@ -59,8 +61,6 @@ public class BasketController : BaseApiController
                 productName = product.Name,
                 PictureUrl = product.PictureUrl,
                 Price = product.Price,
-                Category = product.Category.Name,
-                Brand = product.Brand.Name,
                 Quantity = item.Quantity
             });
         }
@@ -75,6 +75,7 @@ public class BasketController : BaseApiController
         return Ok(updatedBasket);
     }
 
+    [Authorize(Policy = "permission:" + RolePermission.BasketDelete)]
     [HttpDelete]
     public async Task<ActionResult<CustomerBasket>> DeleteBasket()
     {

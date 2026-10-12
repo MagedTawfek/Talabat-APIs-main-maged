@@ -15,14 +15,14 @@ public class ProductService : IProductService
     }
     public async Task<IReadOnlyList<Product>> GetProductsAsync(ProductsSpecParams specParams)
     {
-        var spec = new ProductWithBrandAndCategorySpecifications(specParams);  
+        var spec = new ProductSpecifications(specParams);  
         var products = await _unitOfWork.Repository<Product>().GetAllWithSpecAsync(spec);
         return products;
     }
 
     public async Task<Product?> GetProductAsync(int productId)
     {
-        var spec = new ProductWithBrandAndCategorySpecifications(productId);
+        var spec = new ProductSpecifications(productId);
         var product = await _unitOfWork.Repository<Product>().GetWithSpecAsync(spec);
         return product;
     }
@@ -34,10 +34,11 @@ public class ProductService : IProductService
         return count;
     }
 
-    public async Task<IReadOnlyList<ProductBrand>> GetBrandsAsync()
-        => await _unitOfWork.Repository<ProductBrand>().GetAllAsync();
-
-    public async Task<IReadOnlyList<ProductCategory>> GetCategoryAsync()
-        => await _unitOfWork.Repository<ProductCategory>().GetAllAsync();
+    public async Task<Product> CreateProductAsync(Product product)
+    {
+        await _unitOfWork.Repository<Product>().AddAsync(product);
+        await _unitOfWork.CompleteAsync();
+        return product;
+    }
 
 }

@@ -21,7 +21,7 @@ public class OrderService : IOrderService
         _basketRepo = basketRepo;
     }
     
-    public async Task<Order?> CreateOrderAsync(string buyerEmail, string basketOwnerId, string basketId, int deliveryMethodId, Address shippingAddress)
+    public async Task<Order?> CreateOrderAsync(string buyerEmail, string basketOwnerId, string basketId, Address shippingAddress)
     {
         // get basket from the repo
         var basket = await _basketRepo.GetBasketAsync(basketId, basketOwnerId);
@@ -42,14 +42,10 @@ public class OrderService : IOrderService
         // calculate subtotal
         var subtotal = orderItems.Sum(item => item.Price * item.Quantity);
         
-        // get delivery method
-        var deliveryMethod = await _unitOfWork.Repository<DeliveryMethod>().GetAsync(deliveryMethodId);
-        if (deliveryMethod is null) return null;
-        
         var ordersRepo = _unitOfWork.Repository<Order>();
         
         // create order
-        var order = new Order(buyerEmail, shippingAddress, deliveryMethod, orderItems, subtotal);
+        var order = new Order(buyerEmail, shippingAddress, orderItems, subtotal);
         
         // save to db
 
@@ -80,10 +76,4 @@ public class OrderService : IOrderService
         return order;
     }
 
-    public Task<IReadOnlyList<DeliveryMethod>> GetDeliveryMethodsAsync()
-    {
-        var deliveryMethodsRepo = _unitOfWork.Repository<DeliveryMethod>();
-        var deliveryMethods = deliveryMethodsRepo.GetAllAsync();
-        return deliveryMethods;
-    }
 }

@@ -14,8 +14,6 @@ public class MappingProfiles : Profile
     public MappingProfiles()
     {
         CreateMap<Core.Models.Product, DTOs.ProductToReturnDto>()
-            .ForMember(d => d.Brand, o => o.MapFrom(s => s.Brand.Name))
-            .ForMember(d => d.Category, o => o.MapFrom(s => s.Category.Name))
             .ForMember(d => d.PictureUrl, o => o.MapFrom<ProductPictureUrlResolver>());
 
         CreateMap<AddressDto, Address>().ReverseMap();
@@ -28,8 +26,6 @@ public class MappingProfiles : Profile
             .ForMember(destination => destination.FirstName, options => options.MapFrom(source => source.FName))
             .ForMember(destination => destination.LastName, options => options.MapFrom(source => source.LName));
         CreateMap<Order, OrderToReturnDto>()
-            .ForMember(d => d.DeliveryMethod, o => o.MapFrom(s => s.DeliveryMethod.ShortName))
-            .ForMember(d => d.DeliveryMethodCost, o => o.MapFrom(s => s.DeliveryMethod.Cost))
             .ForMember(d => d.Items, o => o.MapFrom(s => s.OrderItems))
             .ForMember(d => d.Total, o => o.MapFrom(s => s.GetTotal()));
         CreateMap<OrderItem, OrderItemDto>()

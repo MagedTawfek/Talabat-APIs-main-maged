@@ -12,8 +12,5 @@ public class CustomerBasket
     public string? OwnerId { get; set; }
     public List<BasketItem> items { get; set; } 
     
-    public int? DeliveryMethodId { get; set; }
-    
-    public decimal ShippingPrice { get; set; }
 }
 

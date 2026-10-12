@@ -13,6 +13,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Talabat.APIs.Controllers;
 using Talabat.APIs.DTOs;
+using Talabat.APIs.Errors;
 using Talabat.APIs.Helpers;
 using Talabat.Core.Models.Identity;
 using Talabat.Core.Services.Contract;
@@ -93,6 +94,143 @@ public class AccountFlowTests
         var profile = await controller.GetCurrentUser();
         var profileDto = Assert.IsType<UserProfileDto>(Assert.IsType<OkObjectResult>(profile.Result).Value);
         Assert.Equal(registered.Id, profileDto.Id);
+    }
+
+    [Fact]
+    public async Task UpdatePasswordRejectsReusingCurrentPassword()
+    {
+        var options = new DbContextOptionsBuilder<AppIdentityDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        await using var identityDb = new TestIdentityDbContext(options);
+        var user = new AppUser { Id = "customer-1", Email = "customer@example.com", SecurityStamp = "stamp-1" };
+        var userManager = CreateUserManager(identityDb, user);
+        userManager.Setup(manager => manager.FindByIdAsync(user.Id)).ReturnsAsync(user);
+        userManager.Setup(manager => manager.CheckPasswordAsync(user, "CurrentPass123!")).ReturnsAsync(true);
+        var controller = CreatePasswordController(userManager.Object, identityDb, user.Id);
+
+        var result = await controller.UpdateUserPassword(new UpdatePasswordDto
+        {
+            CurrentPassword = "CurrentPass123!",
+            NewPassword = "CurrentPass123!"
+        });
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Contains("different", Assert.Single(Assert.IsType<ApiValidationErrorResponse>(badRequest.Value).Errors));
+        userManager.Verify(manager => manager.ChangePasswordAsync(user, It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdatePasswordRejectsIncorrectCurrentPassword()
+    {
+        var options = new DbContextOptionsBuilder<AppIdentityDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        await using var identityDb = new TestIdentityDbContext(options);
+        var user = new AppUser { Id = "customer-3", Email = "customer@example.com" };
+        var userManager = CreateUserManager(identityDb, user);
+        userManager.Setup(manager => manager.FindByIdAsync(user.Id)).ReturnsAsync(user);
+        userManager.Setup(manager => manager.CheckPasswordAsync(user, "WrongPass123!")).ReturnsAsync(false);
+        var controller = CreatePasswordController(userManager.Object, identityDb, user.Id);
+
+        var result = await controller.UpdateUserPassword(new UpdatePasswordDto
+        {
+            CurrentPassword = "WrongPass123!",
+            NewPassword = "NewPass456!"
+        });
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Contains("incorrect", Assert.Single(Assert.IsType<ApiValidationErrorResponse>(badRequest.Value).Errors));
+        userManager.Verify(manager => manager.ChangePasswordAsync(user, It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdatePasswordReturnsFreshTokensAfterChangingPassword()
+    {
+        var options = new DbContextOptionsBuilder<AppIdentityDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        await using var identityDb = new TestIdentityDbContext(options);
+        var user = new AppUser
+        {
+            Id = "customer-2",
+            Email = "customer@example.com",
+            DisplayName = "Customer",
+            SecurityStamp = "old-stamp"
+        };
+        identityDb.Users.Add(user);
+        var oldRefreshToken = new UserRefreshToken
+        {
+            UserId = user.Id,
+            User = user,
+            TokenHash = "old-refresh-hash",
+            FamilyId = "old-refresh-family",
+            UserSecurityStamp = "old-stamp",
+            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(30)
+        };
+        identityDb.UserRefreshTokens.Add(oldRefreshToken);
+        await identityDb.SaveChangesAsync();
+
+        var userManager = CreateUserManager(identityDb, user);
+        userManager.Setup(manager => manager.FindByIdAsync(user.Id)).ReturnsAsync(user);
+        userManager.Setup(manager => manager.CheckPasswordAsync(user, "OldPass123!")).ReturnsAsync(true);
+        userManager.Setup(manager => manager.CheckPasswordAsync(user, "NewPass456!")).ReturnsAsync(false);
+        userManager.Setup(manager => manager.ChangePasswordAsync(user, "OldPass123!", "NewPass456!"))
+            .Callback(() => user.SecurityStamp = "new-stamp")
+            .ReturnsAsync(IdentityResult.Success);
+
+        var authService = new Mock<IAuthService>();
+        authService.Setup(service => service.CreateTokenAsync(user, userManager.Object)).ReturnsAsync("fresh-access-token");
+        authService.Setup(service => service.CreateRefreshToken()).Returns("fresh-refresh-token");
+        authService.Setup(service => service.HashRefreshToken("fresh-refresh-token")).Returns("fresh-refresh-hash");
+        var controller = CreatePasswordController(userManager.Object, identityDb, user.Id, authService.Object);
+
+        var result = await controller.UpdateUserPassword(new UpdatePasswordDto
+        {
+            CurrentPassword = "OldPass123!",
+            NewPassword = "NewPass456!"
+        });
+
+        var response = Assert.IsType<UserDto>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal("fresh-access-token", response.Token);
+        Assert.Equal("fresh-refresh-token", response.RefreshToken);
+        var refreshTokens = await identityDb.UserRefreshTokens.ToListAsync();
+        Assert.Equal(2, refreshTokens.Count);
+        Assert.NotNull(oldRefreshToken.RevokedAtUtc);
+        var storedRefreshToken = refreshTokens.Single(token => token.TokenHash == "fresh-refresh-hash");
+        Assert.Equal("new-stamp", storedRefreshToken.UserSecurityStamp);
+        Assert.Equal("fresh-refresh-hash", storedRefreshToken.TokenHash);
+    }
+
+    private static AccountController CreatePasswordController(
+        UserManager<AppUser> userManager,
+        AppIdentityDbContext identityDb,
+        string userId,
+        IAuthService? authService = null)
+    {
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["JWT:RefreshTokenLifeTimeDays"] = "30"
+        }).Build();
+        var controller = new AccountController(
+            userManager,
+            CreateSignInManager(userManager).Object,
+            Mock.Of<IMapper>(),
+            authService ?? Mock.Of<IAuthService>(),
+            config,
+            identityDb)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity(
+                        [new Claim(ClaimTypes.NameIdentifier, userId)], "test"))
+                }
+            }
+        };
+        return controller;
     }
 
     private static Mock<UserManager<AppUser>> CreateUserManager(AppIdentityDbContext identityDb, AppUser user)

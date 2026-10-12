@@ -23,10 +23,6 @@ public class OrderServiceTests
         products.Setup(repository => repository.GetAsync(7))
             .ReturnsAsync(new Product { Id = 7, Name = "Coffee", Price = 12.50m, PictureUrl = "coffee.png" });
 
-        var deliveryMethods = new Mock<IGenericRepository<DeliveryMethod>>();
-        deliveryMethods.Setup(repository => repository.GetAsync(3))
-            .ReturnsAsync(new DeliveryMethod("Fast", "Fast delivery", 5m, "1 day") { Id = 3 });
-
         var orders = new Mock<IGenericRepository<Order>>();
         Order? savedOrder = null;
         orders.Setup(repository => repository.AddAsync(It.IsAny<Order>()))
@@ -35,31 +31,29 @@ public class OrderServiceTests
 
         var unitOfWork = new Mock<IUnitOfWork>();
         unitOfWork.Setup(unit => unit.Repository<Product>()).Returns(products.Object);
-        unitOfWork.Setup(unit => unit.Repository<DeliveryMethod>()).Returns(deliveryMethods.Object);
         unitOfWork.Setup(unit => unit.Repository<Order>()).Returns(orders.Object);
         unitOfWork.Setup(unit => unit.CompleteAsync()).ReturnsAsync(1);
 
         var service = new OrderService(basketRepository.Object, unitOfWork.Object);
         var address = new Address("Ada", "Lovelace", "1 Main St", "London", "UK");
 
-        var order = await service.CreateOrderAsync("ada@example.com", "user-1", "basket-1", 3, address);
+        var order = await service.CreateOrderAsync("ada@example.com", "user-1", "basket-1", address);
 
         Assert.NotNull(order);
         Assert.Same(savedOrder, order);
         Assert.Equal("ada@example.com", order.BuyerEmail);
         Assert.Equal(25m, order.Subtotal);
-        Assert.Equal(30m, order.GetTotal());
+        Assert.Equal(25m, order.GetTotal());
         Assert.Equal(12.50m, Assert.Single(order.OrderItems).Price);
         unitOfWork.Verify(unit => unit.CompleteAsync(), Times.Once);
     }
 
     [Theory]
-    [InlineData(false, false, false, 0, false)]
-    [InlineData(true, false, true, 1, false)]
-    [InlineData(true, true, false, 1, false)]
-    [InlineData(true, true, true, 0, false)]
+    [InlineData(false, false, 0, false)]
+    [InlineData(true, false, 1, false)]
+    [InlineData(true, true, 0, false)]
     public async Task CreateOrder_RejectsInvalidBasketProductDeliveryOrSave(
-        bool basketExists, bool productExists, bool deliveryExists, int saveResult, bool expectedOrder)
+        bool basketExists, bool productExists, int saveResult, bool expectedOrder)
     {
         var basketRepository = new Mock<IBasketRepository>();
         basketRepository.Setup(repository => repository.GetBasketAsync("basket-1", "user-1"))
@@ -70,22 +64,17 @@ public class OrderServiceTests
         var products = new Mock<IGenericRepository<Product>>();
         products.Setup(repository => repository.GetAsync(7))
             .ReturnsAsync(productExists ? new Product { Id = 7, Name = "Coffee", Price = 10m } : null);
-        var deliveryMethods = new Mock<IGenericRepository<DeliveryMethod>>();
-        deliveryMethods.Setup(repository => repository.GetAsync(3))
-            .ReturnsAsync(deliveryExists ? new DeliveryMethod("Standard", "Standard", 2m, "3 days") : null);
-
         var unitOfWork = new Mock<IUnitOfWork>();
         unitOfWork.Setup(unit => unit.Repository<Product>()).Returns(products.Object);
-        unitOfWork.Setup(unit => unit.Repository<DeliveryMethod>()).Returns(deliveryMethods.Object);
         unitOfWork.Setup(unit => unit.Repository<Order>()).Returns(Mock.Of<IGenericRepository<Order>>());
         unitOfWork.Setup(unit => unit.CompleteAsync()).ReturnsAsync(saveResult);
 
         var service = new OrderService(basketRepository.Object, unitOfWork.Object);
-        var order = await service.CreateOrderAsync("buyer@example.com", "user-1", "basket-1", 3,
+        var order = await service.CreateOrderAsync("buyer@example.com", "user-1", "basket-1",
             new Address("Ada", "Lovelace", "1 Main St", "London", "UK"));
 
         Assert.Equal(expectedOrder, order is not null);
-        if (!basketExists || !productExists || !deliveryExists)
+        if (!basketExists || !productExists)
             unitOfWork.Verify(unit => unit.CompleteAsync(), Times.Never);
     }
 
@@ -98,7 +87,7 @@ public class OrderServiceTests
         var unitOfWork = new Mock<IUnitOfWork>();
 
         var order = await new OrderService(basketRepository.Object, unitOfWork.Object)
-            .CreateOrderAsync("buyer@example.com", "user-1", "empty", 1,
+            .CreateOrderAsync("buyer@example.com", "user-1", "empty",
                 new Address("Ada", "Lovelace", "1 Main St", "London", "UK"));
 
         Assert.Null(order);
