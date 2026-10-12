@@ -69,6 +69,7 @@ src/
 - API documentation available at `https://localhost:7284/swagger/index.html`
 - Protected endpoints require the JWT access token returned by `/api/account/login` or `/api/account/register`. In Swagger, click **Authorize** and enter the access token. Login, registration, token refresh, product browsing, delivery-method browsing, and error handling are public.
 - New accounts are assigned the `Customer` role automatically. The initial roles are `Admin`, `Customer`, and `Driver`.
+- The `Driver` role currently has no driver-specific API endpoints; drivers can use public catalog and authenticated account endpoints, while basket and order endpoints are Customer-only.
 - Authorization matrix: product catalog and delivery methods are public; account profile, address, password, and logout endpoints require authentication; baskets and orders require `Customer` and are scoped to the signed-in user; all role endpoints and email-existence lookup require `Admin`.
 - Each account has one role at a time. Changing a user's role revokes that user's refresh-token sessions. Existing access tokens expire within 10 minutes, after which the user must sign in again to receive the current role.
 - Access tokens expire after 10 minutes and are checked against the user's Identity security stamp, so logout, password changes, and role changes invalidate them immediately. Refresh tokens are stored as hashes, rotate on refresh, and are revoked on logout, password change, or role change. Reuse of a rotated refresh token revokes that token family.
@@ -104,15 +105,15 @@ src/
 Role permissions are included as `permission` claims in newly issued JWTs. Protect an endpoint with `[Authorize(Policy = "permission:orders.read")]` to require a permission claim for that action.
 
 **BasketController**
-- `GET /api/basket`: Get a basket by ID
-- `POST /api/basket`: Update a basket
-- `DELETE /api/basket/{id}`: Delete the current user's basket
+- `GET /api/basket`: Get the signed-in customer's basket (no basket ID is supplied)
+- `POST /api/basket`: Update the signed-in customer's basket with product IDs and quantities; basket ID and product details/prices are assigned by the server. Example body: `{ "items": [{ "productId": 1, "quantity": 2 }] }`
+- `DELETE /api/basket`: Delete the signed-in customer's basket
 
 **ErrorsController**
 - `GET /errors/{code}`: Handle errors
 
 **OrderController**
-- `POST /api/order`: Create a new order
+- `POST /api/order`: Create a new order using the signed-in customer's basket; send only a delivery method ID and shipping address. Basket ID and shipping cost come from server-side data.
 - `GET /api/order`: Get orders for the current user
 - `GET /api/order/{id}`: Get an order by ID
 - `GET /api/order/deliveryMethods`: Get delivery methods

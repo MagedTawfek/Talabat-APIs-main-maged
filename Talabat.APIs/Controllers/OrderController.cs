@@ -38,7 +38,7 @@ namespace Talabat.APIs.Controllers
             if (string.IsNullOrWhiteSpace(buyerEmail) || string.IsNullOrWhiteSpace(userId))
                 return Unauthorized(new ApiResponse(401));
 
-            var order = await _orderService.CreateOrderAsync(buyerEmail, userId, orderDto.BasketId, orderDto.DeliveryMethodId, address);
+            var order = await _orderService.CreateOrderAsync(buyerEmail, userId, userId, orderDto.DeliveryMethodId, address);
 
            if (order is null) return BadRequest(new ApiResponse(400));
 

@@ -61,6 +61,32 @@ public class AuthServiceTests
         Assert.Equal("Customer", principal.FindFirstValue(ClaimTypes.Role));
     }
 
+    [Theory]
+    [InlineData("Customer")]
+    [InlineData("Driver")]
+    [InlineData("Admin")]
+    public async Task CreateTokenPreservesEachSupportedAccountRole(string roleName)
+    {
+        var user = new AppUser { Id = $"{roleName.ToLowerInvariant()}-1", UserName = "user", Email = "user@example.com" };
+        var userManager = CreateUserManager(user, roleName);
+        var roleManager = CreateRoleManager();
+        roleManager.Setup(manager => manager.FindByNameAsync(roleName)).ReturnsAsync(new IdentityRole(roleName));
+        roleManager.Setup(manager => manager.GetClaimsAsync(It.IsAny<IdentityRole>())).ReturnsAsync([]);
+        var service = new AuthService(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["JWT:SecretKey"] = Secret,
+            ["JWT:ValidIssuer"] = "talabat-tests",
+            ["JWT:ValidAudience"] = "talabat-client",
+            ["JWT:TokenVersion"] = "2",
+            ["JWT:AccessTokenLifeTimeMinutes"] = "10"
+        }).Build(), roleManager.Object);
+
+        var token = await service.CreateTokenAsync(user, userManager.Object);
+        var principal = new JwtSecurityTokenHandler().ReadJwtToken(token);
+
+        Assert.Contains(principal.Claims, claim => claim.Type == ClaimTypes.Role && claim.Value == roleName);
+    }
+
     [Fact]
     public void CreateRefreshToken_ReturnsUniqueCryptographicallyRandomValues()
     {
@@ -76,7 +102,7 @@ public class AuthServiceTests
         Assert.NotEqual(first, service.HashRefreshToken(first));
     }
 
-    private static Mock<UserManager<AppUser>> CreateUserManager(AppUser user)
+    private static Mock<UserManager<AppUser>> CreateUserManager(AppUser user, string role = "Customer")
     {
         var store = new Mock<IUserStore<AppUser>>();
         var manager = new Mock<UserManager<AppUser>>(
@@ -89,7 +115,7 @@ public class AuthServiceTests
             new IdentityErrorDescriber(),
             Mock.Of<IServiceProvider>(),
             Mock.Of<ILogger<UserManager<AppUser>>>());
-        manager.Setup(userManager => userManager.GetRolesAsync(user)).ReturnsAsync(["Customer"]);
+        manager.Setup(userManager => userManager.GetRolesAsync(user)).ReturnsAsync([role]);
         return manager;
     }
 

@@ -28,4 +28,19 @@ public class RequestValidationTests
 
         Assert.Equal(isValid, result);
     }
+
+    [Fact]
+    public void BasketItemAndOrderRejectInvalidClientOwnedValues()
+    {
+        Assert.False(IsValid(new BasketItemDto { ProductId = 0, Quantity = 0 }));
+        Assert.False(IsValid(new BasketItemDto { ProductId = 4, Quantity = 0 }));
+        Assert.False(IsValid(new OrderDto { DeliveryMethodId = 0, ShippingAddress = new AddressDto() }));
+        Assert.True(IsValid(new BasketItemDto { ProductId = 4, Quantity = 2 }));
+    }
+
+    private static bool IsValid(object value)
+    {
+        var results = new List<ValidationResult>();
+        return Validator.TryValidateObject(value, new ValidationContext(value), results, validateAllProperties: true);
+    }
 }

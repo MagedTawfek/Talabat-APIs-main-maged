@@ -1,3 +1,3 @@
 namespace Talabat.APIs.DTOs;
 
-public sealed record UserProfileDto(string Email, string DisplayName);
+public sealed record UserProfileDto(string Id, string Email, string DisplayName);

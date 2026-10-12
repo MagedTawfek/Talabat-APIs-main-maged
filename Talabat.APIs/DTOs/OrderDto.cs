@@ -1,14 +1,11 @@
-﻿using System.ComponentModel.DataAnnotations;
-using Talabat.Core.Models.Order_Aggregate;
+using System.ComponentModel.DataAnnotations;
 
 namespace Talabat.APIs.DTOs;
 
 public class OrderDto
 {
-   [Required]
-    public string BasketId { get; set; }
-    [Required]
+    [Range(1, int.MaxValue)]
     public int DeliveryMethodId { get; set; }
     [Required]
-    public AddressDto ShippingAddress { get; set; }
+    public AddressDto ShippingAddress { get; set; } = new();
 }

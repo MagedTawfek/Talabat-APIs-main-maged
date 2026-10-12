@@ -55,6 +55,7 @@ namespace Talabat.APIs.Controllers
             }
             return new UserDto
             {
+                Id = user.Id,
                 Email = user.Email,
                 Token = await _authService.CreateTokenAsync(user, _userManager),
                 RefreshToken = await IssueRefreshTokenAsync(user),
@@ -104,6 +105,7 @@ namespace Talabat.APIs.Controllers
 
             return new UserDto
             {
+                Id = user.Id,
                 Email = user.Email,
                 Token = await _authService.CreateTokenAsync(user, _userManager),
                 RefreshToken = await IssueRefreshTokenAsync(user),
@@ -160,6 +162,7 @@ namespace Talabat.APIs.Controllers
 
             return new UserDto
             {
+                Id = storedToken.User.Id,
                 Email = storedToken.User.Email,
                 DisplayName = storedToken.User.DisplayName,
                 Token = await _authService.CreateTokenAsync(storedToken.User, _userManager),
@@ -190,7 +193,7 @@ namespace Talabat.APIs.Controllers
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             var user = userId is null ? null : await _userManager.FindByIdAsync(userId);
             return user is null ? NotFound(new ApiResponse(404, "User not found")) :
-                Ok(new UserProfileDto(user.Email!, user.DisplayName));
+                Ok(new UserProfileDto(user.Id, user.Email!, user.DisplayName));
         }
         [HttpGet("address")]
         public async Task<ActionResult<AddressDto>> GetUserAddress()
@@ -205,7 +208,19 @@ namespace Talabat.APIs.Controllers
         {
             var user = await _userManager.FindUserWithAddressAsync(User);
             if (user is null) return NotFound(new ApiResponse(404, "User not found"));
-            user.Address = _mapper.Map<AddressDto, Address>(addressDto);
+            var updatedAddress = _mapper.Map<AddressDto, Address>(addressDto);
+            if (user.Address is null)
+            {
+                user.Address = updatedAddress;
+            }
+            else
+            {
+                user.Address.FName = updatedAddress.FName;
+                user.Address.LName = updatedAddress.LName;
+                user.Address.Street = updatedAddress.Street;
+                user.Address.City = updatedAddress.City;
+                user.Address.Country = updatedAddress.Country;
+            }
             var result = await _userManager.UpdateAsync(user);
             if (result.Succeeded) return Ok(_mapper.Map<Address, AddressDto>(user.Address));
             return BadRequest("Problem updating the user");
@@ -235,26 +250,24 @@ namespace Talabat.APIs.Controllers
                 return BadRequest(new ApiResponse(400, "Problem updating the user"));
             }
 
-            return Ok(new UserProfileDto(user.Email!, user.DisplayName));
+            return Ok(new UserProfileDto(user.Id, user.Email!, user.DisplayName));
         }
         [HttpPut("updatepassword")]
-        public async Task<ActionResult> UpdateUserPassword([FromBody] Dictionary<string, string> passwords)
+        public async Task<ActionResult> UpdateUserPassword([FromBody] UpdatePasswordDto passwords)
         {
-            if (!passwords.ContainsKey("currentPassword") || !passwords.ContainsKey("newPassword"))
-            {
-                return BadRequest(new ApiResponse(400, "Current and new passwords are required"));
-            }
-
             var user = await _userManager.FindByIdAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             if (user == null)
             {
                 return NotFound(new ApiResponse(404, "User not found"));
             }
 
-            var result = await _userManager.ChangePasswordAsync(user, passwords["currentPassword"], passwords["newPassword"]);
+            var result = await _userManager.ChangePasswordAsync(user, passwords.CurrentPassword, passwords.NewPassword);
             if (!result.Succeeded)
             {
-                return BadRequest(new ApiResponse(400, "Problem updating the password"));
+                return BadRequest(new ApiValidationErrorResponse
+                {
+                    Errors = result.Errors.Select(error => error.Description).ToArray()
+                });
             }
 
             await RevokeRefreshTokensAsync(user.Id);
