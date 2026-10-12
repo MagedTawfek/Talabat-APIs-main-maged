@@ -7,5 +7,6 @@ public class OrderDto
     [Required]
     public string BasketId { get; set; } = string.Empty;
 
-    public AddressDto ShippingAddress { get; set; } = new();
+    [System.ComponentModel.DataAnnotations.Range(1, int.MaxValue)]
+    public int AddressId { get; set; }
 }

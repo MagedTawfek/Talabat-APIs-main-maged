@@ -16,13 +16,12 @@ public class MappingProfiles : Profile
         CreateMap<Core.Models.Product, DTOs.ProductToReturnDto>()
             .ForMember(d => d.PictureUrl, o => o.MapFrom<ProductPictureUrlResolver>());
 
-        CreateMap<AddressDto, Address>().ReverseMap();
-        CreateMap<AddressDto, IdentityAddress>()
-            .ForMember(destination => destination.FName, options => options.MapFrom(source => source.FirstName))
-            .ForMember(destination => destination.LName, options => options.MapFrom(source => source.LastName))
+        CreateMap<AddressInputDto, IdentityAddress>()
             .ForMember(destination => destination.Id, options => options.Ignore())
             .ForMember(destination => destination.AppUserId, options => options.Ignore())
-            .ReverseMap()
+            .ForMember(destination => destination.FName, options => options.MapFrom(source => source.FirstName))
+            .ForMember(destination => destination.LName, options => options.MapFrom(source => source.LastName));
+        CreateMap<IdentityAddress, AddressDto>()
             .ForMember(destination => destination.FirstName, options => options.MapFrom(source => source.FName))
             .ForMember(destination => destination.LastName, options => options.MapFrom(source => source.LName));
         CreateMap<Order, OrderToReturnDto>()

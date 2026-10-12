@@ -7,4 +7,5 @@ public interface IBasketRepository
     Task<CustomerBasket?> GetBasketAsync(string basketId, string ownerId);
     Task<CustomerBasket?> UpdateBasketAsync(CustomerBasket basket, string ownerId);
     Task<bool> DeleteBasketAsync(string basketId, string ownerId);
+    Task<bool> RemoveBasketAsync(string basketId, string ownerId);
 }

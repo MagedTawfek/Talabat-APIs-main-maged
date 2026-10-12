@@ -10,14 +10,16 @@ namespace Talabat.Tests;
 public class OrderServiceTests
 {
     [Fact]
-    public async Task CreateOrder_UsesDatabasePricesAndPersistsBuyerScopedOrder()
+    public async Task CreateOrder_UsesDatabasePricesAndConsumesAuthenticatedUsersBasket()
     {
         var basketRepository = new Mock<IBasketRepository>();
-        basketRepository.Setup(repository => repository.GetBasketAsync("basket-1", "user-1"))
-            .ReturnsAsync(new CustomerBasket("basket-1")
+        basketRepository.Setup(repository => repository.GetBasketAsync("user-1", "user-1"))
+            .ReturnsAsync(new CustomerBasket("user-1")
             {
                 items = [new BasketItem { Id = 7, Price = 0.01m, Quantity = 2 }]
             });
+        basketRepository.Setup(repository => repository.RemoveBasketAsync("user-1", "user-1"))
+            .ReturnsAsync(true);
 
         var products = new Mock<IGenericRepository<Product>>();
         products.Setup(repository => repository.GetAsync(7))
@@ -32,34 +34,38 @@ public class OrderServiceTests
         var unitOfWork = new Mock<IUnitOfWork>();
         unitOfWork.Setup(unit => unit.Repository<Product>()).Returns(products.Object);
         unitOfWork.Setup(unit => unit.Repository<Order>()).Returns(orders.Object);
-        unitOfWork.Setup(unit => unit.CompleteAsync()).ReturnsAsync(1);
+        unitOfWork.Setup(unit => unit.CompleteAsync()).ReturnsAsync(2);
 
         var service = new OrderService(basketRepository.Object, unitOfWork.Object);
         var address = new Address("Ada", "Lovelace", "1 Main St", "London", "UK");
 
-        var order = await service.CreateOrderAsync("ada@example.com", "user-1", "basket-1", address);
+        var result = await service.CreateOrderAsync("ada@example.com", "user-1", "user-1", address);
 
-        Assert.NotNull(order);
-        Assert.Same(savedOrder, order);
-        Assert.Equal("ada@example.com", order.BuyerEmail);
-        Assert.Equal(25m, order.Subtotal);
-        Assert.Equal(25m, order.GetTotal());
-        Assert.Equal(12.50m, Assert.Single(order.OrderItems).Price);
+        Assert.True(result.Succeeded);
+        Assert.Same(savedOrder, result.Order);
+        Assert.Equal("ada@example.com", result.Order!.BuyerEmail);
+        Assert.Equal(25m, result.Order.Subtotal);
+        Assert.Equal(25m, result.Order.GetTotal());
+        Assert.Equal(12.50m, Assert.Single(result.Order.OrderItems).Price);
+        basketRepository.Verify(repository => repository.RemoveBasketAsync("user-1", "user-1"), Times.Once);
         unitOfWork.Verify(unit => unit.CompleteAsync(), Times.Once);
     }
 
     [Theory]
-    [InlineData(false, false, 0, false)]
-    [InlineData(true, false, 1, false)]
-    [InlineData(true, true, 0, false)]
-    public async Task CreateOrder_RejectsInvalidBasketProductDeliveryOrSave(
-        bool basketExists, bool productExists, int saveResult, bool expectedOrder)
+    [InlineData(false, true, 1, false, 400)]
+    [InlineData(true, false, 1, false, 400)]
+    [InlineData(true, true, 0, true, 500)]
+    [InlineData(true, true, 1, true, 200)]
+    public async Task CreateOrder_ReportsBasketProductAndPersistenceFailures(
+        bool basketExists, bool productExists, int saveResult, bool basketRemoved, int expectedStatus)
     {
         var basketRepository = new Mock<IBasketRepository>();
-        basketRepository.Setup(repository => repository.GetBasketAsync("basket-1", "user-1"))
+        basketRepository.Setup(repository => repository.GetBasketAsync("user-1", "user-1"))
             .ReturnsAsync(basketExists
-                ? new CustomerBasket("basket-1") { items = [new BasketItem { Id = 7, Quantity = 1 }] }
+                ? new CustomerBasket("user-1") { items = [new BasketItem { Id = 7, Quantity = 1 }] }
                 : null);
+        basketRepository.Setup(repository => repository.RemoveBasketAsync("user-1", "user-1"))
+            .ReturnsAsync(basketRemoved);
 
         var products = new Mock<IGenericRepository<Product>>();
         products.Setup(repository => repository.GetAsync(7))
@@ -69,36 +75,48 @@ public class OrderServiceTests
         unitOfWork.Setup(unit => unit.Repository<Order>()).Returns(Mock.Of<IGenericRepository<Order>>());
         unitOfWork.Setup(unit => unit.CompleteAsync()).ReturnsAsync(saveResult);
 
-        var service = new OrderService(basketRepository.Object, unitOfWork.Object);
-        var order = await service.CreateOrderAsync("buyer@example.com", "user-1", "basket-1",
-            new Address("Ada", "Lovelace", "1 Main St", "London", "UK"));
+        var result = await new OrderService(basketRepository.Object, unitOfWork.Object)
+            .CreateOrderAsync("buyer@example.com", "user-1", "user-1",
+                new Address("Ada", "Lovelace", "1 Main St", "London", "UK"));
 
-        Assert.Equal(expectedOrder, order is not null);
+        Assert.Equal(expectedStatus == 200, result.Succeeded);
+        Assert.Equal(expectedStatus, result.StatusCode);
         if (!basketExists || !productExists)
             unitOfWork.Verify(unit => unit.CompleteAsync(), Times.Never);
     }
 
     [Fact]
-    public async Task CreateOrder_RejectsEmptyBasket()
+    public async Task CreateOrder_ReturnsConflictWhenBasketWasAlreadyConsumed()
     {
         var basketRepository = new Mock<IBasketRepository>();
-        basketRepository.Setup(repository => repository.GetBasketAsync("empty", "user-1"))
-            .ReturnsAsync(new CustomerBasket("empty"));
+        basketRepository.Setup(repository => repository.GetBasketAsync("user-1", "user-1"))
+            .ReturnsAsync(new CustomerBasket("user-1")
+            {
+                items = [new BasketItem { Id = 7, Quantity = 1 }]
+            });
+        basketRepository.Setup(repository => repository.RemoveBasketAsync("user-1", "user-1"))
+            .ReturnsAsync(false);
+        var products = new Mock<IGenericRepository<Product>>();
+        products.Setup(repository => repository.GetAsync(7))
+            .ReturnsAsync(new Product { Id = 7, Name = "Coffee", Price = 10m });
         var unitOfWork = new Mock<IUnitOfWork>();
+        unitOfWork.Setup(unit => unit.Repository<Product>()).Returns(products.Object);
+        unitOfWork.Setup(unit => unit.Repository<Order>()).Returns(Mock.Of<IGenericRepository<Order>>());
 
-        var order = await new OrderService(basketRepository.Object, unitOfWork.Object)
-            .CreateOrderAsync("buyer@example.com", "user-1", "empty",
+        var result = await new OrderService(basketRepository.Object, unitOfWork.Object)
+            .CreateOrderAsync("buyer@example.com", "user-1", "user-1",
                 new Address("Ada", "Lovelace", "1 Main St", "London", "UK"));
 
-        Assert.Null(order);
-        unitOfWork.Verify(unit => unit.Repository<Product>(), Times.Never);
+        Assert.Equal(409, result.StatusCode);
+        Assert.False(result.Succeeded);
+        unitOfWork.Verify(unit => unit.CompleteAsync(), Times.Never);
     }
 
     [Fact]
     public async Task GetOrderByIdForUser_PassesBuyerEmailIntoRepositorySpecification()
     {
         var orders = new Mock<IGenericRepository<Order>>();
-        orders.Setup(repository => repository.GetWithSpecAsync(It.IsAny<Talabat.Core.Specification.ISpecification<Order>>()))
+        orders.Setup(repository => repository.GetWithSpecAsync(It.IsAny<Talabat.Core.Specification.ISpecification<Order>>() ) )
             .ReturnsAsync((Order?)null);
         var unitOfWork = new Mock<IUnitOfWork>();
         unitOfWork.Setup(unit => unit.Repository<Order>()).Returns(orders.Object);

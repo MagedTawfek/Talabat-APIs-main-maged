@@ -19,13 +19,15 @@ public class AddressMappingTests
 
         var dto = mapper.Map<AddressDto>(new IdentityAddress
         {
+            Id = 17,
+            AppUserId = "user-1",
             FName = "Ada",
             LName = "Lovelace",
             Street = "1 Main St",
             City = "London",
             Country = "UK"
         });
-        var address = mapper.Map<IdentityAddress>(new AddressDto
+        var address = mapper.Map<IdentityAddress>(new AddressInputDto
         {
             FirstName = "Grace",
             LastName = "Hopper",
@@ -36,8 +38,11 @@ public class AddressMappingTests
 
         Assert.Equal("Ada", dto.FirstName);
         Assert.Equal("Lovelace", dto.LastName);
+        Assert.Equal(17, dto.Id);
         Assert.Equal("Grace", address.FName);
         Assert.Equal("Hopper", address.LName);
+        Assert.Equal(0, address.Id);
+        Assert.Null(address.AppUserId);
     }
 
     [Fact]

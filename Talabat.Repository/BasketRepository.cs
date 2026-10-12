@@ -44,11 +44,17 @@ public class BasketRepository : IBasketRepository
 
     public async Task<bool> DeleteBasketAsync(string basketId, string ownerId)
     {
+        if (!await RemoveBasketAsync(basketId, ownerId)) return false;
+        return await _context.SaveChangesAsync() > 0;
+    }
+
+    public async Task<bool> RemoveBasketAsync(string basketId, string ownerId)
+    {
         var basket = await _context.CustomerBaskets
             .FirstOrDefaultAsync(current => current.id == basketId && current.OwnerId == ownerId);
         if (basket is null) return false;
 
         _context.CustomerBaskets.Remove(basket);
-        return await _context.SaveChangesAsync() > 0;
+        return true;
     }
 }

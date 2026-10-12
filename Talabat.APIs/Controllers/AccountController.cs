@@ -200,15 +200,33 @@ namespace Talabat.APIs.Controllers
         {
             var user = await _userManager.FindUserWithAddressAsync(User);
             if (user is null) return NotFound(new ApiResponse(404, "User not found"));
+            if (user.Address is null) return NotFound(new ApiResponse(404, "Address not found"));
             var address = _mapper.Map<Address, AddressDto>(user.Address);
             return Ok(address);
         }
-        [HttpPut("address")]
-        public async Task<ActionResult<AddressDto>> UpdateUserAddress(AddressDto addressDto)
+        [HttpPost("address")]
+        public async Task<ActionResult<AddressDto>> CreateUserAddress(AddressInputDto addressDto)
         {
             var user = await _userManager.FindUserWithAddressAsync(User);
             if (user is null) return NotFound(new ApiResponse(404, "User not found"));
-            var updatedAddress = _mapper.Map<AddressDto, Address>(addressDto);
+            if (user.Address is not null)
+                return Conflict(new ApiResponse(409, "An address already exists. Update the existing address instead."));
+
+            user.Address = _mapper.Map<Address>(addressDto);
+            user.Address.AppUserId = user.Id;
+            var result = await _userManager.UpdateAsync(user);
+            if (!result.Succeeded)
+                return BadRequest(new ApiResponse(400, "The address could not be saved."));
+
+            var createdAddress = _mapper.Map<AddressDto>(user.Address);
+            return CreatedAtAction(nameof(GetUserAddress), value: createdAddress);
+        }
+        [HttpPut("address")]
+        public async Task<ActionResult<AddressDto>> UpdateUserAddress(AddressInputDto addressDto)
+        {
+            var user = await _userManager.FindUserWithAddressAsync(User);
+            if (user is null) return NotFound(new ApiResponse(404, "User not found"));
+            var updatedAddress = _mapper.Map<AddressInputDto, Address>(addressDto);
             if (user.Address is null)
             {
                 user.Address = updatedAddress;

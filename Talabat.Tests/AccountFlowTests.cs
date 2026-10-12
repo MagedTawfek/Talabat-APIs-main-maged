@@ -25,6 +25,59 @@ namespace Talabat.Tests;
 public class AccountFlowTests
 {
     [Fact]
+    public async Task PostAddressCreatesGeneratedIdAndGetAddressReturnsTheSavedAddress()
+    {
+        var options = new DbContextOptionsBuilder<AppIdentityDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        await using var identityDb = new TestIdentityDbContext(options);
+        var user = new AppUser
+        {
+            Id = "address-user-1",
+            UserName = "ada@example.com",
+            Email = "ada@example.com",
+            DisplayName = "Ada"
+        };
+        identityDb.Users.Add(user);
+        await identityDb.SaveChangesAsync();
+
+        var userManager = CreateUserManager(identityDb, user);
+        userManager.Setup(manager => manager.Users).Returns(identityDb.Users);
+        userManager.Setup(manager => manager.FindByIdAsync(user.Id)).ReturnsAsync(user);
+        userManager.Setup(manager => manager.UpdateAsync(user)).Returns(async () =>
+        {
+            await identityDb.SaveChangesAsync();
+            return IdentityResult.Success;
+        });
+
+        var mapperConfiguration = new MapperConfiguration(configuration => configuration.AddProfile<MappingProfiles>());
+        var controller = CreateAddressController(userManager.Object, identityDb, mapperConfiguration.CreateMapper(), user.Id);
+
+        var postResult = await controller.CreateUserAddress(new AddressInputDto
+        {
+            FirstName = "Ada",
+            LastName = "Lovelace",
+            Street = "1 Main St",
+            City = "London",
+            Country = "UK"
+        });
+
+        var createdResponse = Assert.IsType<CreatedAtActionResult>(postResult.Result);
+        var createdAddress = Assert.IsType<AddressDto>(createdResponse.Value);
+        Assert.True(createdAddress.Id > 0);
+
+        var getResult = await controller.GetUserAddress();
+
+        var savedAddress = Assert.IsType<AddressDto>(Assert.IsType<OkObjectResult>(getResult.Result).Value);
+        Assert.Equal(createdAddress.Id, savedAddress.Id);
+        Assert.Equal("Ada", savedAddress.FirstName);
+        Assert.Equal("Lovelace", savedAddress.LastName);
+        Assert.Equal("1 Main St", savedAddress.Street);
+        Assert.Equal("London", savedAddress.City);
+        Assert.Equal("UK", savedAddress.Country);
+    }
+
+    [Fact]
     public async Task CustomerCanRegisterLoginRefreshAndReadGeneratedAccountId()
     {
         var options = new DbContextOptionsBuilder<AppIdentityDbContext>()
@@ -219,6 +272,32 @@ public class AccountFlowTests
             Mock.Of<IMapper>(),
             authService ?? Mock.Of<IAuthService>(),
             config,
+            identityDb)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity(
+                        [new Claim(ClaimTypes.NameIdentifier, userId)], "test"))
+                }
+            }
+        };
+        return controller;
+    }
+
+    private static AccountController CreateAddressController(
+        UserManager<AppUser> userManager,
+        AppIdentityDbContext identityDb,
+        IMapper mapper,
+        string userId)
+    {
+        var controller = new AccountController(
+            userManager,
+            CreateSignInManager(userManager).Object,
+            mapper,
+            Mock.Of<IAuthService>(),
+            new ConfigurationBuilder().AddInMemoryCollection().Build(),
             identityDb)
         {
             ControllerContext = new ControllerContext

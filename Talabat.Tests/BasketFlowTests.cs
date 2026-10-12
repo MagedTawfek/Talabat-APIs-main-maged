@@ -86,7 +86,7 @@ public class BasketFlowTests
         {
             Items = [new BasketItemDto { ProductId = 7, Quantity = 2 }]
         });
-        var orderJson = JsonSerializer.Serialize(new OrderDto());
+        var orderJson = JsonSerializer.Serialize(new OrderDto { BasketId = "customer-123", AddressId = 3 });
 
         Assert.Contains("ProductId", basketJson);
         Assert.Contains("Quantity", basketJson);
@@ -97,6 +97,7 @@ public class BasketFlowTests
         Assert.False(basketDocument.RootElement.TryGetProperty("Id", out _));
         Assert.False(basketDocument.RootElement.GetProperty("Items")[0].TryGetProperty("Price", out _));
         Assert.True(orderDocument.RootElement.TryGetProperty("BasketId", out _));
+        Assert.True(orderDocument.RootElement.TryGetProperty("AddressId", out _));
         Assert.False(basketDocument.RootElement.TryGetProperty("ShippingPrice", out _));
     }
 
