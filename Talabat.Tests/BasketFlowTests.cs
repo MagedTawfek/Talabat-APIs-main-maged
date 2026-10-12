@@ -96,7 +96,7 @@ public class BasketFlowTests
         using var orderDocument = JsonDocument.Parse(orderJson);
         Assert.False(basketDocument.RootElement.TryGetProperty("Id", out _));
         Assert.False(basketDocument.RootElement.GetProperty("Items")[0].TryGetProperty("Price", out _));
-        Assert.False(orderDocument.RootElement.TryGetProperty("BasketId", out _));
+        Assert.True(orderDocument.RootElement.TryGetProperty("BasketId", out _));
         Assert.False(basketDocument.RootElement.TryGetProperty("ShippingPrice", out _));
     }
 

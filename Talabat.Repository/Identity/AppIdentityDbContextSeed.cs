@@ -9,7 +9,17 @@ public static class AppIdentityDbContextSeed
     private static readonly string[] DefaultRoles = ["Admin", "Customer", "Driver"];
     private static readonly IReadOnlyDictionary<string, string[]> DefaultRolePermissions = new Dictionary<string, string[]>
     {
-        ["Admin"] = [RolePermission.ProductsCreate, RolePermission.RolesManage, RolePermission.AccountEmailLookup],
+        ["Admin"] =
+        [
+            RolePermission.ProductsCreate,
+            RolePermission.RolesManage,
+            RolePermission.AccountEmailLookup,
+            RolePermission.BasketRead,
+            RolePermission.BasketWrite,
+            RolePermission.BasketDelete,
+            RolePermission.OrdersCreate,
+            RolePermission.OrdersRead
+        ],
         ["Customer"] = [RolePermission.BasketRead, RolePermission.BasketWrite, RolePermission.BasketDelete,
             RolePermission.OrdersCreate, RolePermission.OrdersRead]
     };

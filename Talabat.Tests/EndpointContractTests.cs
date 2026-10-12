@@ -47,7 +47,8 @@ public class EndpointContractTests
         Assert.DoesNotContain(typeof(ProductToReturnDto).GetProperties(), property => property.Name.Contains("Category", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(typeof(CustomerBasketDto).GetProperties(), property => property.Name is "Id" or "OwnerId" or "ShippingPrice");
         Assert.Equal(new[] { "ProductId", "Quantity" }, typeof(BasketItemDto).GetProperties().Select(property => property.Name).OrderBy(name => name));
-        Assert.DoesNotContain(typeof(OrderDto).GetProperties(), property => property.Name is "BasketId" or "ShippingPrice");
+        Assert.Contains(typeof(OrderDto).GetProperties(), property => property.Name == "BasketId");
+        Assert.DoesNotContain(typeof(OrderDto).GetProperties(), property => property.Name == "ShippingPrice");
         Assert.DoesNotContain(typeof(AddressDto).GetProperties(), property => property.Name is "Id" or "AppUserId");
     }
 }

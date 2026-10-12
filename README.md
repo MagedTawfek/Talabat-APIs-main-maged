@@ -69,12 +69,11 @@ src/
 - API documentation available at `https://localhost:7284/swagger/index.html`
 - Protected endpoints require the JWT access token returned by `/api/account/login` or `/api/account/register`. In Swagger, click **Authorize** and enter the access token. Login, registration, token refresh, product browsing, delivery-method browsing, and error handling are public.
 - New accounts are assigned the `Customer` role automatically. The initial roles are `Admin`, `Customer`, and `Driver`.
-- The `Driver` role has no default permissions. An administrator can grant it specific capabilities, such as reading orders, through role permissions.
+- The `Admin` role receives every permission used by the API. The `Driver` role has no default permissions. An administrator can grant it specific capabilities, such as reading orders, through role permissions.
 - Authorization matrix: product catalog is public; account profile, address, password, and logout endpoints require authentication; basket/order endpoints require their matching permissions and remain scoped to the signed-in user. Role management and email lookup require their matching permissions; the `Admin` role receives them by default.
 - Each account has one role at a time. Changing a user's role revokes that user's refresh-token sessions. Existing access tokens expire within 10 minutes, after which the user must sign in again to receive the current role.
 - Access tokens expire after 10 minutes and are checked against the user's Identity security stamp, so logout, password changes, and role changes invalidate them immediately. Refresh tokens are stored as hashes, rotate on refresh, and are revoked on logout, password change, or role change. Reuse of a rotated refresh token revokes that token family.
 - Detailed endpoint documentation in the `Talabat.APIs` project
-- Postman documentation available [here](https://documenter.getpostman.com/view/28646082/2sAY4yfghP)
 
 ### Development Workflow
 1. Make changes to the code.
@@ -102,7 +101,7 @@ src/
 - `PUT /api/roles/{roleName}/permissions`: Add a permission using `{ "permission": "orders.read" }` (`roles.manage`)
 - `PUT /api/roles/users/{email}/role`: Set a user's role (`roles.manage`)
 
-Role permissions are enforced on the protected basket, order, product creation, and role management endpoints. The API copies permission claims from the user's role into newly issued JWTs and checks the matching permission policy on every request. Default permissions are assigned to the `Admin` and `Customer` roles at startup; the `Driver` role has no default permissions. After changing a role's permissions or assigning a different role, the affected user must sign in again to get a token containing the updated permissions.
+Role permissions are enforced on the protected basket, order, product creation, and role management endpoints. The API copies permission claims from the user's role into newly issued JWTs and checks the matching permission policy on every request. The `Admin` role receives every permission, the `Customer` role receives basket and order permissions, and the `Driver` role has no default permissions. After changing a role's permissions or assigning a different role, the affected user must sign in again to get a token containing the updated permissions.
 
 Permission names currently used by endpoints: `basket.read`, `basket.write`, `basket.delete`, `orders.create`, `orders.read`, `products.create`, `roles.manage`, and `accounts.email.lookup`. For example, adding `orders.read` to a role allows its signed-in users to read their own orders; users without that permission receive `403 Forbidden`.
 
@@ -115,7 +114,7 @@ Permission names currently used by endpoints: `basket.read`, `basket.write`, `ba
 - `GET /errors/{code}`: Handle errors
 
 **OrderController**
-- `POST /api/order`: Create a new order (`orders.create`) using the signed-in user's basket; send the shipping address. Basket ID comes from server-side data; total is calculated from current product prices.
+- `POST /api/order`: Create a new order (`orders.create`); send `basketId` and `shippingAddress`. The API verifies that the basket belongs to the signed-in user, and calculates the total from current product prices.
 - `GET /api/order`: Get orders for the current user (`orders.read`)
 - `GET /api/order/{id}`: Get an order by ID (`orders.read`)
 

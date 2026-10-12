@@ -12,13 +12,14 @@ namespace Talabat.Tests;
 public class OrderFlowTests
 {
     [Fact]
-    public async Task PostOrderUsesAuthenticatedCustomerBasketWithoutClientSuppliedBasketId()
+    public async Task PostOrderUsesProvidedBasketIdAndAuthenticatedOwner()
     {
         const string customerId = "customer-456";
+        const string basketId = "basket-789";
         string? basketIdUsed = null;
         var orderService = new Mock<IOrderService>();
         orderService.Setup(service => service.CreateOrderAsync(
-                "customer@example.com", customerId, It.IsAny<string>(), It.IsAny<Address>()))
+                "customer@example.com", customerId, basketId, It.IsAny<Address>()))
             .Callback<string, string, string, Address>((_, _, basketId, _) => basketIdUsed = basketId)
             .ReturnsAsync((Order?)null);
 
@@ -40,6 +41,7 @@ public class OrderFlowTests
 
         var result = await controller.CreateOrder(new OrderDto
         {
+            BasketId = basketId,
             ShippingAddress = new AddressDto
             {
                 FirstName = "Ada",
@@ -51,8 +53,8 @@ public class OrderFlowTests
         });
 
         Assert.IsType<BadRequestObjectResult>(result.Result);
-        Assert.Equal(customerId, basketIdUsed);
+        Assert.Equal(basketId, basketIdUsed);
         orderService.Verify(service => service.CreateOrderAsync(
-            "customer@example.com", customerId, customerId, It.IsAny<Address>()), Times.Once);
+            "customer@example.com", customerId, basketId, It.IsAny<Address>()), Times.Once);
     }
 }
