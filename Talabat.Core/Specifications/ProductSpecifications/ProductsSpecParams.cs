@@ -1,21 +1,25 @@
-﻿namespace Talabat.Core.Specifications.ProductSpecifications;
+using System.ComponentModel.DataAnnotations;
+
+namespace Talabat.Core.Specifications.ProductSpecifications;
 
 public class ProductsSpecParams
 {
+    [StringLength(10)]
+    [RegularExpression("^(priceAsc|priceDesc)?$")]
     public string? sort { get; set; }
-    private const int MazPageSize = 10;
-    private int _pageSize = 5  ;
-    public int PageSize
-    {
-        get => _pageSize;
-        set => _pageSize = (value > 50) ? MazPageSize : value;
-    }
+
+    [Range(1, 50)]
+    public int PageSize { get; set; } = 5;
+
+    [Range(1, 100000)]
     public int PageIndex { get; set; } = 1;
 
     private string? _search;
+
+    [StringLength(100)]
     public string? Search
     {
         get => _search;
-        set => _search = value?.ToLower();
+        set => _search = value?.Trim().ToLowerInvariant();
     }
 }

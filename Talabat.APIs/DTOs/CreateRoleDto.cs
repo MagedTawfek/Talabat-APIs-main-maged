@@ -7,7 +7,9 @@ public sealed record CreateRoleDto
 {
     [Required]
     [StringLength(256, MinimumLength = 2)]
+    [RegularExpression("^[\\p{L}\\p{N}][\\p{L}\\p{N} _.-]*$")]
     public required string Name { get; init; }
 
+    [Required, ValidPermissionList]
     public IReadOnlyList<string> Permissions { get; init; } = [];
 }

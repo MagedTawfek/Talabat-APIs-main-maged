@@ -4,9 +4,9 @@ namespace Talabat.APIs.DTOs;
 
 public class OrderDto
 {
-    [Required]
+    [Required, StringLength(450, MinimumLength = 1)]
     public string BasketId { get; set; } = string.Empty;
 
-    [System.ComponentModel.DataAnnotations.Range(1, int.MaxValue)]
+    [Range(1, int.MaxValue)]
     public int AddressId { get; set; }
 }

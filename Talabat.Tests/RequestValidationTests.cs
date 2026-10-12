@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Talabat.APIs.DTOs;
+using Talabat.Core.Specifications.ProductSpecifications;
 
 namespace Talabat.Tests;
 
@@ -38,6 +39,68 @@ public class RequestValidationTests
         Assert.False(IsValid(new OrderDto { AddressId = 12 }));
         Assert.True(IsValid(new OrderDto { AddressId = 12, BasketId = "user-1" }));
         Assert.True(IsValid(new BasketItemDto { ProductId = 4, Quantity = 2 }));
+    }
+
+    [Fact]
+    public void ProductInputRejectsInvalidLengthsAndPrices()
+    {
+        Assert.False(IsValid(new CreateProductDto
+        {
+            Name = new string('x', 101), Description = "A valid description", PictureUrl = "/product.png", Price = 1m
+        }));
+        Assert.False(IsValid(new CreateProductDto
+        {
+            Name = "Tea", Description = "short", PictureUrl = "/product.png", Price = 0m
+        }));
+        Assert.False(IsValid(new CreateProductDto
+        {
+            Name = "Tea", Description = "A valid description", PictureUrl = "/product.png", Price = 1.256m
+        }));
+        Assert.True(IsValid(new CreateProductDto
+        {
+            Name = "Tea", Description = "A valid description", PictureUrl = "/product.png", Price = 1.25m
+        }));
+    }
+
+    [Fact]
+    public void AddressAndProfileInputsRejectMissingOrOverlongFields()
+    {
+        Assert.False(IsValid(new AddressInputDto { FirstName = "", LastName = "Lovelace", Street = "1 Main St", City = "London", Country = "UK" }));
+        Assert.False(IsValid(new AddressInputDto { FirstName = "Ada", LastName = "Lovelace", Street = new string('s', 251), City = "London", Country = "UK" }));
+        Assert.True(IsValid(new AddressInputDto { FirstName = "Ada", LastName = "Lovelace", Street = "1 Main St", City = "London", Country = "UK" }));
+        Assert.False(IsValid(new UpdateUserDto { DisplayName = "A", PhoneNumber = "bad" }));
+        Assert.True(IsValid(new UpdateUserDto { DisplayName = "Ada Lovelace", PhoneNumber = "+44123456789" }));
+    }
+
+    [Fact]
+    public void RoleAndPermissionInputsRejectMalformedValues()
+    {
+        Assert.False(IsValid(new CreateRoleDto { Name = "!invalid", Permissions = [] }));
+        Assert.True(IsValid(new CreateRoleDto { Name = "Support", Permissions = ["orders.read", "basket.write"] }));
+        Assert.False(IsValid(new CreateRoleDto { Name = "Support", Permissions = [""] }));
+        Assert.False(IsValid(new UpdateRolePermissionDto { Permission = "orders read" }));
+        Assert.True(IsValid(new UpdateRolePermissionDto { Permission = "orders.read" }));
+        Assert.False(IsValid(new AssignRoleDto { RoleName = "?" }));
+    }
+
+    [Fact]
+    public void ProductQueryRejectsInvalidPaginationAndSortValues()
+    {
+        Assert.False(IsValid(new ProductsSpecParams { PageIndex = 0 }));
+        Assert.False(IsValid(new ProductsSpecParams { PageSize = 51 }));
+        Assert.False(IsValid(new ProductsSpecParams { sort = "price;drop" }));
+        Assert.True(IsValid(new ProductsSpecParams { PageIndex = 1, PageSize = 25, sort = "priceAsc", Search = "tea" }));
+    }
+
+    [Fact]
+    public void BasketAndCredentialInputsRejectOversizedOrMalformedValues()
+    {
+        Assert.False(IsValid(new CustomerBasketDto { Items = [] }));
+        Assert.True(IsValid(new CustomerBasketDto { Items = [new BasketItemDto { ProductId = 4, Quantity = 1 }] }));
+        Assert.False(IsValid(new LoginDto { Email = "not-an-email", Password = "Password123!" }));
+        Assert.False(IsValid(new UpdatePasswordDto { CurrentPassword = "CurrentPass123!", NewPassword = "weak" }));
+        Assert.True(IsValid(new UpdatePasswordDto { CurrentPassword = "CurrentPass123!", NewPassword = "NewPassword456!" }));
+        Assert.False(IsValid(new RefreshTokenDto { RefreshToken = "short" }));
     }
 
     private static bool IsValid(object value)
